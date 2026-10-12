@@ -1,12 +1,11 @@
 import { storybookEditorActor } from "@/lib/storybook-editor-auth";
 import { bindings } from "@/db/runtime";
 import { cleanText, id, jsonError, noStoreJson, randomToken, rateLimit, sameOrigin } from "@/lib/security";
-import { ownedStorybook, storybookAssets } from "@/lib/storybook-store";
+import { ownedStorybook, storybookAsset, storybookArtworkAsset, type StorybookAssetRow } from "@/lib/storybook-store";
 
 // Vercel Functions의 4.5MB 요청 한도 아래에서 raw PNG로 전송한다. base64 JSON은
 // 같은 그림을 약 33% 키우므로 사용하지 않는다.
 const MAX_UPLOAD_BYTES = 3_500_000;
-const MAX_ASSETS_PER_BOOK = 60;
 
 function validatePng(bytes: Uint8Array) {
   if (bytes.length > MAX_UPLOAD_BYTES) return false;
@@ -18,7 +17,7 @@ function validatePng(bytes: Uint8Array) {
   return Boolean(width && height && width <= 4096 && height <= 4096 && width * height <= 16_000_000);
 }
 
-function publicAsset(asset: Awaited<ReturnType<typeof storybookAssets>>[number]) {
+function publicAsset(asset: StorybookAssetRow) {
   const { objectKey: _objectKey, studentId: _studentId, ...value } = asset;
   void _objectKey;
   void _studentId;
@@ -32,8 +31,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!(await rateLimit(`storybook-asset:${student.id}`, new URL(request.url).pathname.startsWith("/api/teacher/") ? 180 : 30, 60))) return jsonError("이미지를 너무 빠르게 추가하고 있어요.", 429);
   const storybookId = cleanText((await context.params).id, 80);
   if (!(await ownedStorybook(storybookId, student.id))) return jsonError("내 그림책이 아니거나 찾을 수 없어요.", 404);
-  const currentAssets = await storybookAssets(storybookId, student.id);
-  if (!new URL(request.url).pathname.startsWith("/api/teacher/") && currentAssets.length >= MAX_ASSETS_PER_BOOK) return jsonError("한 그림책에는 이미지 60개까지 넣을 수 있어요.", 413);
+  // Keep all originals without imposing a picture count quota or reading the full list.
   const contentType = request.headers.get("content-type") ?? "";
   const payload = contentType.startsWith("application/json")
     ? await request.json().catch(() => ({})) as Record<string, unknown>
@@ -41,7 +39,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const sourceType = contentType.startsWith("image/png") ? "upload" : cleanText(payload.sourceType, 20);
   if (sourceType === "artwork") {
     const artworkId = cleanText(payload.artworkId, 80);
-    const existing = currentAssets.find((asset) => asset.sourceType === "artwork" && asset.sourceArtworkId === artworkId);
+    const existing = await storybookArtworkAsset(storybookId, student.id, artworkId);
     if (existing) return noStoreJson({ asset: publicAsset(existing), duplicate: true });
     const artwork = await bindings().DB.prepare(`SELECT id, final_image_key AS finalImageKey FROM artworks WHERE id = ? AND student_id = ? AND status = 'complete' AND final_image_key IS NOT NULL`).bind(artworkId, student.id).first<{ id: string; finalImageKey: string }>();
     if (!artwork) return jsonError("완성된 내 그림을 찾을 수 없어요.", 404);
@@ -49,7 +47,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (!object) return jsonError("완성 그림 파일을 찾을 수 없어요.", 404);
     const assetId = id("asset");
     await bindings().DB.prepare(`INSERT INTO storybook_assets(id, storybook_id, student_id, source_type, source_artwork_id, object_key, content_type, byte_size) VALUES (?, ?, ?, 'artwork', ?, ?, ?, ?)`).bind(assetId, storybookId, student.id, artwork.id, artwork.finalImageKey, object.httpMetadata?.contentType ?? "image/png", object.size).run();
-    const created = (await storybookAssets(storybookId, student.id)).find((asset) => asset.id === assetId);
+    const created = await storybookAsset(storybookId, student.id, assetId);
     return created ? noStoreJson({ asset: publicAsset(created) }, { status: 201 }) : jsonError("이미지를 추가할 수 없어요.", 409);
   }
   if (sourceType !== "upload") return jsonError("추가할 이미지 종류를 확인해 주세요.");
@@ -70,6 +68,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     await bindings().ARTWORKS.delete(objectKey).catch(() => undefined);
     throw error;
   }
-  const created = (await storybookAssets(storybookId, student.id)).find((asset) => asset.id === assetId);
+  const created = await storybookAsset(storybookId, student.id, assetId);
   return created ? noStoreJson({ asset: publicAsset(created) }, { status: 201 }) : jsonError("이미지를 추가할 수 없어요.", 409);
 }

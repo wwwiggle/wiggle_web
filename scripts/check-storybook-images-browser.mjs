@@ -20,6 +20,13 @@ const id=(await(await server.fetch('/api/storybooks',{method:'POST',headers,body
 const rgb=Buffer.alloc(300*240*3,255);
 for(let y=55;y<185;y++)for(let x=65;x<235;x++){const i=(y*300+x)*3;rgb[i]=30;rgb[i+1]=105;rgb[i+2]=190;}
 const png=await sharp(rgb,{raw:{width:300,height:240,channels:3}}).png().toBuffer();
+// Simulate originals retained after deleting pictures or saving new cutouts. The
+// first visible paste reaches 60 stored assets; saving its cutout crosses that limit.
+const retainedUpload=await server.fetch(`/api/storybooks/${id}/assets`,{method:'POST',headers:{...headers,'content-type':'image/png'},body:png});
+assert.equal(retainedUpload.status,201);
+const retainedId=(await retainedUpload.json()).asset.id;
+const retained=await server.DB.prepare('SELECT object_key FROM storybook_assets WHERE id=?').bind(retainedId).first();
+await server.DB.batch(Array.from({length:58},(_,i)=>server.DB.prepare("INSERT INTO storybook_assets(id,storybook_id,student_id,source_type,object_key,content_type,byte_size) VALUES(?,?,?,'upload',?,'image/png',?)").bind(`asset_retained${String(i).padStart(8,'0')}`,id,student,retained.object_key,png.length)));
 const output='work/storybook-images';await mkdir(output,{recursive:true});
 const browser=await chromium.launch({executablePath:process.env.BOOK_CHROME_PATH||undefined,headless:true});
 try{
@@ -36,6 +43,7 @@ try{
  await page.goto(server.origin+'/student/books/'+id);await page.getByRole('textbox',{name:'이 쪽의 이야기',exact:true}).waitFor();
  await clipboard();await page.keyboard.press('Control+v');await image().waitFor();await saved();
  assert.equal(await image().count(),1);const original=(await stored()).pages[0].elements.find(e=>e.type==='image');
+ assert.equal((await server.DB.prepare('SELECT count(*) AS n FROM storybook_assets WHERE storybook_id=?').bind(id).first()).n,60,'one visible picture with 60 retained assets');
  const originalBytes=Buffer.from(await(await server.fetch(`/api/storybooks/${id}/assets/${original.assetId}`,{headers})).arrayBuffer());
  const before=await geometry();await btn('＋ 크게').click();const larger=await geometry();assert.ok(larger.width>before.width);assert.ok(Math.abs(larger.width/larger.height-before.width/before.height)<.01);
  await page.getByRole('checkbox',{name:'비율 유지',exact:true}).uncheck();await range('그림 크기',.45);await range('그림 세로 크기',.2);let g=await geometry();assert.ok(Math.abs(g.width-.45)<.01&&Math.abs(g.height-.2)<.01);
@@ -58,6 +66,7 @@ try{
  await btn('닫기').click();assert.equal((await stored()).pages[0].elements.find(e=>e.type==='image').assetId,original.assetId,'cancel preserves original');
  await btn('✂️ 배경 지우기').click();await page.waitForFunction(()=>!Array.from(document.querySelectorAll('.image-cutout-modal button')).find(b=>b.textContent==='이 그림 넣기')?.disabled);await btn('이 그림 넣기').click();await page.locator('.image-cutout-modal').waitFor({state:'hidden'});await saved();
  let newDoc=await stored(),cut=newDoc.pages[0].elements.find(e=>e.type==='image');assert.notEqual(cut.assetId,original.assetId);
+ assert.equal((await server.DB.prepare('SELECT count(*) AS n FROM storybook_assets WHERE storybook_id=?').bind(id).first()).n,61,'cutout succeeds beyond 60 without deleting originals');
  assert.deepEqual(Buffer.from(await(await server.fetch(`/api/storybooks/${id}/assets/${original.assetId}`,{headers})).arrayBuffer()),originalBytes);
  const cutBytes=Buffer.from(await(await server.fetch(`/api/storybooks/${id}/assets/${cut.assetId}`,{headers})).arrayBuffer());const {data,info}=await sharp(cutBytes).ensureAlpha().raw().toBuffer({resolveWithObject:true});assert.equal(data[3],0);assert.equal(data[(Math.floor(info.height/2)*info.width+Math.floor(info.width/2))*4+3],255);
  const uncut=documentBeforeUndo.pages[0].elements.find(e=>e.type==='image');assert.ok(Math.abs(cut.width*300/info.width-uncut.width)<.001&&Math.abs(cut.height*240/info.height-uncut.height)<.001,'background removal preserves the stretched picture scale');
@@ -98,5 +107,14 @@ try{
  await source.locator('div').focus();await source.evaluate(()=>{const range=document.createRange();range.selectNode(document.querySelector('img'));const selection=getSelection();selection.removeAllRanges();selection.addRange(range);});
  await source.keyboard.press('Control+c');await source.close();await page.bringToFront();await page.keyboard.press('Control+v');
  await page.waitForFunction(count=>document.querySelectorAll('.storybook-stage:not(.preview) .image').length===count+1,imageCount);await saved();
- assert.deepEqual(errors,[]);console.log('PASS real Ctrl+C/Ctrl+V across pages, native clipboard image/text/button, free sizing/drag, cutout preview/undo/cancel/alpha/original asset, reload, delayed upload page identity, six viewport sizes');
+ // Re-selecting the same file after the old lifetime limit must still fire onChange.
+ for(let i=0;i<2;i++){
+  await page.locator('input[type=file]').first().setInputFiles({name:'같은 그림.png',mimeType:'image/png',buffer:png});
+  await page.waitForFunction(count=>document.querySelectorAll('.storybook-stage:not(.preview) .image').length===count,imageCount+2+i);await saved();
+ }
+ const afterUploads=await stored();await page.reload();await image().waitFor();
+ assert.deepEqual(await stored(),afterUploads);
+ assert.equal(await page.locator('.storybook-stage:not(.preview) .image').count(),imageCount+3);
+ assert.deepEqual(Buffer.from(await(await server.fetch(`/api/storybooks/${id}/assets/${retainedId}`,{headers})).arrayBuffer()),png,'retained originals are never cleaned up to make room');
+ assert.deepEqual(errors,[]);console.log('PASS beyond 60 retained images: actual clipboard/file uploads, repeated same-file selection, cutout save and original preservation, reload, delayed upload page identity, sizing and six viewport sizes');
 }finally{await browser.close();await server.dispose();}

@@ -7,7 +7,7 @@ export function storybookCompletionError(title: string, pageCount: number, stude
   if (student && pageCount < MIN_STORYBOOK_PAGES) return `표지를 포함해 최소 ${MIN_STORYBOOK_PAGES}페이지가 필요해요. 지금은 ${pageCount}페이지예요.`;
   return "";
 }
-export const MAX_STORYBOOK_ELEMENTS_PER_PAGE = 50;
+// Pictures have no per-page count quota. Bound serialized metadata, not children's pictures.
 // Keep metadata below the hosting request-body limit, independently of print page counts.
 export const MAX_STORYBOOK_DOCUMENT_BYTES = 3_500_000;
 export const MAX_STORYBOOK_TEXT_GRAPHEMES = 800;
@@ -164,7 +164,7 @@ export function validateStorybookDocument(value: unknown): StorybookDocument | n
     if (!page.background || !COLOR_PATTERN.test(page.background)) return null;
     if (page.backgroundAssetId !== undefined && (!page.backgroundAssetId || !ID_PATTERN.test(page.backgroundAssetId))) return null;
     if (page.template !== undefined && !STORYBOOK_TEMPLATES.includes(page.template)) return null;
-    if (!Array.isArray(page.elements) || page.elements.length > MAX_STORYBOOK_ELEMENTS_PER_PAGE) return null;
+    if (!Array.isArray(page.elements)) return null;
     pageIds.add(page.id);
     const elements: StorybookElement[] = [];
     for (const rawElement of page.elements) {
@@ -200,7 +200,7 @@ export function applyStorybookTemplate(page: StorybookPage, template: StorybookT
       const original = elements[index];
       elements[index] = { ...original, verticalAlign: "middle", ...field, text: original.text || field.text || "" };
       used.add(original.id);
-    } else if (elements.length < MAX_STORYBOOK_ELEMENTS_PER_PAGE) {
+    } else {
       const element = { ...createStorybookTextElement(makeId()), verticalAlign: "middle" as const, ...field };
       elements.push(element); used.add(element.id);
     }

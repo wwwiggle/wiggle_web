@@ -2,7 +2,7 @@ import { storybookEditorActor } from "@/lib/storybook-editor-auth";
 import { bindings } from "@/db/runtime";
 import { MAX_STORYBOOK_PAGES, storybookCompletionError, validateStorybookDocument } from "@/lib/storybook-model";
 import { cleanText, jsonError, noStoreJson, rateLimit, sameOrigin } from "@/lib/security";
-import { ownedStorybook, priorStorybookMutation, storybookAssets, storybookResponse } from "@/lib/storybook-store";
+import { ownedStorybook, priorStorybookMutation, storybookAssets, storybookAssetIds, storybookResponse } from "@/lib/storybook-store";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const student = await storybookEditorActor(request);
@@ -39,8 +39,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     ...page.elements.filter((element) => element.type === "image").map((element) => element.assetId as string),
   ]));
   if (referencedAssets.size) {
-    const ownedAssets = await storybookAssets(storybookId, student.id);
-    if ([...referencedAssets].some((assetId) => !ownedAssets.some((asset) => asset.id === assetId))) return jsonError("다른 그림책의 이미지는 사용할 수 없어요.", 403);
+    const ownedAssets = await storybookAssetIds(storybookId, student.id);
+    if ([...referencedAssets].some((assetId) => !ownedAssets.has(assetId))) return jsonError("다른 그림책의 이미지는 사용할 수 없어요.", 403);
   }
   const title = typeof payload.title === "string" ? cleanText(payload.title, 60) : book.title;
   const complete = payload.complete === true;
