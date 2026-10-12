@@ -5,7 +5,7 @@ import {
   applyStorybookTemplate,
   STORYBOOK_TEMPLATES,
   emptyStorybookDocument,
-  MAX_STORYBOOK_ELEMENTS_PER_PAGE,
+  MAX_STORYBOOK_DOCUMENT_BYTES,
   MAX_STORYBOOK_TEXT_GRAPHEMES,
   STORYBOOK_IMAGE_AREA,
   STORYBOOK_TEXT_BOX,
@@ -116,13 +116,9 @@ test("가져온 책은 24쪽·인쇄 상한을 넘어도 모든 쪽을 보존한
   }
 });
 
-test("빈 책·요소·글자 수 상한과 중복 ID를 거부한다", () => {
+test("빈 책·글자 수 상한과 중복 ID를 거부한다", () => {
   const empty = emptyStorybookDocument(); empty.pages = [];
   assert.equal(validateStorybookDocument(empty), null);
-
-  const tooManyElements = emptyStorybookDocument();
-  tooManyElements.pages[0].elements = Array.from({ length: MAX_STORYBOOK_ELEMENTS_PER_PAGE + 1 }, (_, index) => textElement({ id: `element_${String(index).padStart(8, "0")}` }));
-  assert.equal(validateStorybookDocument(tooManyElements), null);
 
   const longText = emptyStorybookDocument();
   longText.pages[0].elements = [textElement({ text: "가".repeat(MAX_STORYBOOK_TEXT_GRAPHEMES + 1) })];
@@ -131,6 +127,20 @@ test("빈 책·요소·글자 수 상한과 중복 ID를 거부한다", () => {
   const duplicate = emptyStorybookDocument();
   duplicate.pages[0].elements = [textElement(), textElement()];
   assert.equal(validateStorybookDocument(duplicate), null);
+});
+
+test("한 쪽의 그림은 50개를 넘어도 모두 저장하고 양식의 글칸을 추가한다", () => {
+  for (const count of [51, 200, 1000, 2000]) {
+    const document = emptyStorybookDocument();
+    const pictures = Array.from({ length: count }, (_, index) => imageElement({ id: `element_many${String(index).padStart(8, "0")}` }));
+    document.pages[0].elements = pictures;
+    assert.deepEqual(validateStorybookDocument(document), document);
+    let field = 0;
+    document.pages[0] = applyStorybookTemplate(document.pages[0], "cover", () => `element_field${String(field++).padStart(8, "0")}`);
+    const saved = validateStorybookDocument(document);
+    assert.deepEqual(saved.pages[0].elements.filter(element => element.type === "image"), pictures);
+    assert.deepEqual(saved.pages[0].elements.filter(element => element.type === "text").map(element => element.textRole), ["title", "credit"]);
+  }
 });
 
 test("저장 문서에 제어문자와 비정상 숫자를 허용하지 않는다", () => {
@@ -144,14 +154,10 @@ test("저장 문서에 제어문자와 비정상 숫자를 허용하지 않는�
 
 test("문서 한도는 UTF-16 글자 수가 아니라 실제 UTF-8 바이트로 계산한다", () => {
   const document = emptyStorybookDocument();
-  document.pages = Array.from({ length: 400 }, (_, pageIndex) => ({
-    id: `page_${String(pageIndex).padStart(8, "0")}`,
-    background: "#FFFFFF",
-    elements: [
-      createStorybookTextElement(`element_text${String(pageIndex).padStart(8, "0")}`),
-      ...Array.from({ length: MAX_STORYBOOK_ELEMENTS_PER_PAGE - 1 }, (_, elementIndex) => imageElement({ id: `element_${String(pageIndex * 100 + elementIndex).padStart(8, "0")}` })),
-    ],
+  document.pages[0].elements = Array.from({ length: 1500 }, (_, index) => ({
+    ...createStorybookTextElement(`element_text${String(index).padStart(8, "0")}`), text: "한".repeat(MAX_STORYBOOK_TEXT_GRAPHEMES),
   }));
-  for (const page of document.pages) page.elements[0].text = "한".repeat(MAX_STORYBOOK_TEXT_GRAPHEMES);
+  assert.ok(JSON.stringify(document).length < MAX_STORYBOOK_DOCUMENT_BYTES);
+  assert.ok(Buffer.byteLength(JSON.stringify(document)) > MAX_STORYBOOK_DOCUMENT_BYTES);
   assert.equal(validateStorybookDocument(document), null);
 });
