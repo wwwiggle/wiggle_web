@@ -6,7 +6,6 @@ import { ownedStorybook, storybookAssets } from "@/lib/storybook-store";
 // Vercel Functions의 4.5MB 요청 한도 아래에서 raw PNG로 전송한다. base64 JSON은
 // 같은 그림을 약 33% 키우므로 사용하지 않는다.
 const MAX_UPLOAD_BYTES = 3_500_000;
-const MAX_ASSETS_PER_BOOK = 60;
 
 function validatePng(bytes: Uint8Array) {
   if (bytes.length > MAX_UPLOAD_BYTES) return false;
@@ -33,7 +32,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const storybookId = cleanText((await context.params).id, 80);
   if (!(await ownedStorybook(storybookId, student.id))) return jsonError("내 그림책이 아니거나 찾을 수 없어요.", 404);
   const currentAssets = await storybookAssets(storybookId, student.id);
-  if (!new URL(request.url).pathname.startsWith("/api/teacher/") && currentAssets.length >= MAX_ASSETS_PER_BOOK) return jsonError("한 그림책에는 이미지 60개까지 넣을 수 있어요.", 413);
+  // Retained originals and prior cutouts are not visible-picture counts. Never use
+  // this list's length to block new images; keep originals for undo and saved copies.
   const contentType = request.headers.get("content-type") ?? "";
   const payload = contentType.startsWith("application/json")
     ? await request.json().catch(() => ({})) as Record<string, unknown>
