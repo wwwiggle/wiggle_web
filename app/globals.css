@@ -1326,7 +1326,9 @@ body {
 .teacher-story-page { position:relative; width:min(100%,1060px,calc(133.333dvh - 253.333px)); aspect-ratio:4/3; overflow:hidden; container-type:inline-size; background:#fff; box-shadow:0 18px 55px rgba(39,79,47,.18); }.teacher-story-page.format-square { width:min(100%,780px,calc(100dvh - 190px)); aspect-ratio:1; }.teacher-story-page.format-squarebook-hc { width:min(100%,780px,calc((100dvh - 190px) * 243 / 248)); aspect-ratio:243/248; }.teacher-story-page.format-portrait { width:min(100%,620px,calc(75dvh - 142.5px)); aspect-ratio:3/4; }
 .teacher-story-background { position:absolute; inset:0; z-index:0; width:100%; height:100%; object-fit:cover; }.teacher-story-element { position:absolute; min-width:0; min-height:0; overflow:hidden; transform-origin:center; }.teacher-story-element.image img { position:absolute; max-width:none; }.teacher-story-element.text { display:grid; place-items:center; padding:0 1%; overflow:hidden; font-weight:800; line-height:1.35; white-space:pre-wrap; overflow-wrap:anywhere; }.teacher-story-element.text span { max-width:100%; max-height:100%; overflow:hidden; }
 .teacher-book-thumbnails { max-width:1120px; margin:18px auto 0; padding:10px; display:flex; justify-content:center; gap:8px; overflow:auto; }.teacher-book-thumbnails button { flex:0 0 auto; width:52px; min-height:48px; padding:4px; border:2px solid transparent; border-radius:12px; background:#fff; }.teacher-book-thumbnails button.active { border-color:#299439; }.teacher-book-thumbnails span { width:100%; height:38px; display:grid; place-items:center; border-radius:7px; color:#2b4331; font-weight:900; }
-.teacher-print-pages { display:none; }
+.teacher-print-pages,.teacher-print-blocked { display:none; }
+.teacher-print-status { margin:12px 0; padding:12px 16px; border:1px solid #c9d9bd; border-radius:12px; background:#f2f8ed; color:#243c35; overflow-wrap:anywhere; }
+.teacher-print-status p { margin:0 0 10px; }
 
 @media (max-width:900px) {
   .teacher-storybook-grid { grid-template-columns:1fr; }.teacher-storybook-grid>article { grid-template-columns:160px minmax(0,1fr); }
@@ -1341,9 +1343,11 @@ body {
 @media print {
   @page { margin:0; }
   body { background:#fff!important; }
-  .teacher-book-preview-header,.teacher-book-reader,.teacher-book-thumbnails { display:none!important; }
+  .teacher-book-preview-header,.teacher-book-reader,.teacher-book-thumbnails,.teacher-print-status { display:none!important; }
   .teacher-book-preview-shell { min-height:0; padding:0; background:#fff; }
   .teacher-print-pages { display:block; }
+  .teacher-book-preview-shell[data-print-ready="false"] .teacher-print-pages { display:none!important; }
+  .teacher-book-preview-shell[data-print-ready="false"] .teacher-print-blocked { display:block; margin:24mm; color:#000; font-size:16pt; }
   .teacher-print-pages>article { min-height:100vh; display:grid; place-items:center; align-content:center; break-after:page; page-break-after:always; }
   .teacher-print-pages>article:last-child { break-after:auto; page-break-after:auto; }
   .teacher-print-pages .teacher-story-page { width:94vw; max-height:90vh; box-shadow:none; }

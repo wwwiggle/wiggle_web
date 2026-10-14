@@ -55,6 +55,6 @@ export function AuthenticatedImage({ src, alt, className, onLoad, style, lazy = 
     void entry.promise.then(value => { if (!cancelled) setUrl(value); }).catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; entry.users--; prune(cache, !shared); };
   }, [src, shared, visible]);
-  if (url) return <img className={className} src={url} alt={alt} draggable={false} decoding="async" onLoad={onLoad} style={style} />;
-  return <span ref={marker} className={className} style={style} role="img" aria-label={failed ? `${alt}을 불러오지 못했어요` : `${alt}을 불러오는 중`}>{failed ? "⚠️" : "🎨"}</span>;
+  if (url && !failed) return <img className={className} src={url} alt={alt} draggable={false} decoding="async" onLoad={onLoad} onError={() => setFailed(true)} style={style} />;
+  return <span ref={marker} data-image-state={failed ? "error" : "loading"} className={className} style={style} role="img" aria-label={failed ? `${alt}을 불러오지 못했어요` : `${alt}을 불러오는 중`}>{failed ? "⚠️" : "🎨"}</span>;
 }
