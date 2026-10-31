@@ -1,5 +1,52 @@
 # Wiggle Web 현재 상태
 
+## 2026-10-31 그림책 주문·견적서·입금 계좌 + 그림 그리기 유료 잠금 (브랜치 `claude/book-order-quote`)
+
+- 결정 원문과 흐름은 `product-decisions.md` 「2026-10-31 그림책 주문·견적서 구조」, 잠금 목록은 `docs/paid-features.md`, 남은 결정은 `pending-decisions.md`에 있다.
+
+**새로 만든 것**
+- 표 `book_orders`(`lib/operations-schema.ts`, `db/schema.ts`). 금융 기록이라 학급을 지워도 남도록 `classroom_id`에 외래키를 걸지 않았다.
+- 서버 코드
+  - `lib/book-order-pricing.ts`: 견적 계산. 화면 미리 계산과 서버가 같이 쓴다.
+  - `lib/book-orders.ts`: 주문·견적·상태·설정.
+- API
+  - `/api/teacher/book-orders`: GET 목록·가격, POST 주문·취소.
+  - `/api/book-orders/[id]`: 견적서. 주문한 교사와 운영자만 본다.
+  - `/api/admin/book-orders`: 주문 목록·상태·메모·가격과 계좌 설정.
+- 화면
+  - `TeacherBookOrderDesk`: 주문 화면.
+  - `BookOrderQuote`: 견적서. 계좌·금액 복사, 인쇄 또는 PDF 저장.
+  - `AdminBookOrders`: 관리자 화면 첫 탭.
+  - 기존 제작 요청 화면은 `/books/print-request`로 옮겼다.
+
+**그림 그리기 잠금**
+- `lib/feature-locks.ts`의 `DRAWING_LOCKED`로 켠다.
+- 화면은 `PaidLock`과 `DrawingLocked`가 막는다: 학생 「그림 자리」, 보관함, 완성 그림 상세, 그림책 편집기의 「그림 그리러 가기」, `/student/draw/*`, 선생님 「오늘 수업」 학생 그림 칸.
+- 쓰기 API 5곳은 403 `DRAWING_LOCKED`를 돌려준다.
+- 그림·그림책이 없는 학생도 빈 도화지로 보내지 않는다.
+
+**바뀐 테스트**
+- 그림 진입 문자열을 그대로 대조하던 `student-art-desk`·`feedback-20260809` 테스트 4개를 잠금 조건에 맞게 고쳤다.
+- 새 테스트 `tests/book-orders.test.mjs`
+  - 견적 계산 단위 테스트.
+  - HTTP 흐름: 가격 설정 전 차단, 운영자만 설정, 잘못된 주문 거절, 멱등, 견적 금액·계좌·입금자명, 실명 미포함, 가격을 바꿔도 견적 유지, 상태 흐름, 교사 취소, 그림 쓰기 API 403, 그림책 생성 유지, 그림판 잠금 화면.
+
+**검증**
+- 자동 검사: production build, 전체 **447/447 테스트**, typecheck, lint 오류 0(기존 경고 14), `git diff --check`.
+- 실제 브라우저: `next start`(로컬 DB, 시험용 관리자 이메일 `ADMIN_EMAILS`)에서 아래 흐름을 확인했다.
+  - 관리자 가격·계좌 저장 → 교사 주문 화면에서 3종 4권 주문. 미리 본 금액 136,800원 = 견적서 금액.
+  - 견적서: 계좌, 입금자명, 공급가액·부가세.
+  - 관리자 「입금 확인」 → 견적서 상태가 바뀐다.
+  - 학생 「그림 자리」의 잠금 카드: 금지 커서가 뜨고, 눌러도 이동하지 않으며, 그림판 링크가 0개다.
+  - `/student/draw/new` 잠금 화면, 선생님 「오늘 수업」 잠금 칸.
+  - 320×568·390×844·844×390에서 가로 넘침이 없다.
+- 실제 기기(iPad·갤럭시 탭)와 운영 환경은 아직 확인하지 않았다.
+
+**남은 위험**
+- 가격·계좌를 관리자 화면에서 넣기 전에는 선생님이 주문할 수 없다(안내 문구가 보인다).
+- 입금 확인 후 실제 발주는 아직 운영자가 손으로 한다.
+- 개발용 `/student/books/demo`는 그림 저장 API를 쓰므로 잠긴 동안 동작하지 않는다.
+
 ## 2026-10-31 저장소 이전 — `wwwiggle/wiggle_web` 단일 저장소
 
 - 사용자 지시: "이제 깃허브 저장소를 옮겨서 https://github.com/wwwiggle/wiggle_web.git 여기야. 여기서 작업 새로 할거거든? 환경을 조금씩 다 바꿨어."

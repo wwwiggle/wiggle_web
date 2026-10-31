@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { PaidLock } from "./PaidLock";
+import { DRAWING_LOCKED } from "@/lib/feature-locks";
 import { deactivateProfile, studentFetch } from "@/lib/client-session";
 import { Logo } from "./Logo";
 import { FLIP_MS, flipAnnouncement, FlipDirection, FlipPhase, settleIndex, stepIndex, swipeDirection } from "./ArchiveFlip";
@@ -262,9 +264,11 @@ export function Archive() {
               <button type="button" className="archive-pager-button" onClick={() => move("next")} disabled={busy || index >= artworks.length - 1} aria-label="다음 그림 보기"><span aria-hidden="true">›</span></button>
             </div>}
 
-            <a className="button primary child-primary-action archive-book-open" href={drawing ? `/student/draw/${selected.id}` : `/student/archive/${selected.id}`}>
-              <span aria-hidden="true">{drawing ? "✏️" : "👀"}</span>{drawing ? "이어 그리기" : "다시 보기"}
-            </a>
+            {drawing && DRAWING_LOCKED
+              ? <PaidLock className="button primary child-primary-action archive-book-open"><span aria-hidden="true">✏️</span>이어 그리기</PaidLock>
+              : <a className="button primary child-primary-action archive-book-open" href={drawing ? `/student/draw/${selected.id}` : `/student/archive/${selected.id}`}>
+                <span aria-hidden="true">{drawing ? "✏️" : "👀"}</span>{drawing ? "이어 그리기" : "다시 보기"}
+              </a>}
           </> : <p className="archive-book-empty">{loading ? "그림을 불러오는 중이에요…" : "그림을 그리면 여기에 모여요."}</p>}
         </section>
       </div>

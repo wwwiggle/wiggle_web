@@ -17,7 +17,8 @@ test("그림·그림책이 모두 없으면 도화지로 가고 PDF만 있는 �
   // 페이지 크기(artworks 40장)가 아니라 총수로 본다 — 41장째부터 0장으로 읽히면 안 된다.
   assert.match(entry, /if \(!Number\(payload\.artworkTotal\)\)/);
   assert.match(entry, /studentFetch\("\/api\/storybooks"\)/);
-  assert.match(entry, /if \(!books\.storybooks\?\.length\) \{ location\.replace\("\/student\/draw\/new\?mode=free"\); return; \}/);
+  // 2026-10-31: 그림 그리기가 유료 요금제로 잠기면 빈 도화지로 보내지 않고 그림 자리(그림책 만들기)를 보여 준다.
+  assert.match(entry, /if \(!books\.storybooks\?\.length && !DRAWING_LOCKED\) \{ location\.replace\("\/student\/draw\/new\?mode=free"\); return; \}/);
   assert.match(entry, /if \(data\) return <StudentArtDesk /);
 });
 
@@ -29,7 +30,9 @@ test("그리던 그림을 자동으로 열지 않는다", async () => {
   const desk = await read("../app/components/StudentArtDesk.tsx");
   // 이어 그리기는 목록 카드의 행동이다.
   assert.match(desk, /\{drawing \? "이어 그리기" : "그림 보기"\}/);
-  assert.match(desk, /href=\{drawing \? `\/student\/draw\/\$\{encodeURIComponent\(artwork\.id\)\}` : `\/student\/archive\/\$\{encodeURIComponent\(artwork\.id\)\}`\}/);
+  assert.match(desk, /href: drawing \? `\/student\/draw\/\$\{encodeURIComponent\(artwork\.id\)\}` : `\/student\/archive\/\$\{encodeURIComponent\(artwork\.id\)\}`/);
+  // 잠긴 동안(유료 요금제) 그리다 만 그림 카드는 링크가 아니라 누를 수 없는 span이다.
+  assert.match(desk, /const locked = drawing && DRAWING_LOCKED;\r?\n  const Card = locked \? "span" : "a";/);
 });
 
 test("시안을 배경으로 깔지 않고 장식만 따로 놓는다", async () => {
@@ -55,7 +58,7 @@ test("카드 안에 링크를 중첩하지 않고, 상태를 글자로 적는다
   for (const name of ["function ArtworkCard", "function BookCard"]) {
     const start = desk.indexOf(name);
     const body = desk.slice(start, desk.indexOf("\n}", start));
-    const opens = [...body.matchAll(/<(a|button)\b/g)];
+    const opens = [...body.matchAll(/<(a|button|Card)\b/g)]; // Card = 잠김에 따라 <a> 또는 <span>
     assert.equal(opens.length, 1, `${name} 안에 링크·단추가 둘 이상이다: ${opens.map((m) => m[1])}`);
   }
   assert.match(desk, /<span className="desk-art-go">/);
