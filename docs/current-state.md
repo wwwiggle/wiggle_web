@@ -13,6 +13,8 @@
   - 재연결 뒤 **자동** 배포는 다음 main 커밋에서 확인한다(이 PR 병합이 첫 확인).
   - #39(DB 겸용 코드)가 저장 경로를 건드려 `check-deployed` 운영 실측이 필요하다 — 검증용 학생이 생기므로 사용자 확인 뒤.
   - Vercel Preview 환경의 `WIGGLE_DATA_ENV`가 `production`이라, 코드의 안전장치("preview 실행 환경의 WIGGLE_DATA_ENV는 'preview'여야 해요")에 걸려 미리보기 빌드가 실패한다. Preview용 DB를 정하는 `preview/supabase` 작업 때 함께 정한다.
+    Preview 환경 변수(`WIGGLE_DATA_ENV`·`TURSO_*`·`R2_S3_BUCKET` 등)가 69일 전부터 Production과 한 항목으로 묶여 운영 값을 가리킨다. `WIGGLE_DATA_ENV`만 `preview`로 바꾸면 미리보기가 운영 DB에 쓰게 되므로 그렇게 하지 않는다.
+  - 그때까지 임시로(사용자 지시 "우선 미리보기 꺼줘") Vercel 프로젝트의 **Ignored Build Step**을 `[ "$VERCEL_ENV" != "production" ]`로 두어 main 외 브랜치 빌드를 건너뛴다(API로 만든 시험 미리보기가 CANCELED로 끝남 확인). Preview DB를 붙이면 이 설정을 지운다(Vercel → Settings → Git, 또는 API 필드 `commandForIgnoringBuildStep`).
 - 이 클론을 `vercel link`하자 CLI가 `.env.local`에 `VERCEL_OIDC_TOKEN` 활성 줄을 만들었다. 규칙대로 `# vercel-only:` 주석으로 바꿨다. 다른 기기에서 `vercel link`·`vercel env pull`을 쓰면 같은 일이 생긴다.
 - PR #38(`claude/security-deps-entry-lock`)에 main `70cccea`를 병합해 충돌(`CLAUDE.md`·이 문서)을 풀었다. 새로 더한 `rate_limits` 조회·`substr` 삭제는 #39의 Postgres 어댑터(`?`→`$n`, bigint→number)로도 그대로 돈다. 검증: production build 포함 **457/457**, typecheck, lint 오류 0(경고 14), 운영 의존성 감사 심각·높음 0(보통 9 exceljs).
 
