@@ -1,9 +1,9 @@
 # Wiggle Web 현재 상태
 
-## 2026-10-31 그림책 만들기 개편 — book_creator TODO 9개 반영 (로컬 검증 완료, 커밋 전)
+## 2026-10-31 그림책 만들기 개편 — book_creator TODO 9개 반영 (검증·PR #36 제출 완료)
 
 - 출처: 사용자의 `qudcks1940/book_creator` `TODO.md`·`docs/cover-and-ebook.md`·`docs/privacy-school-info.md`. 결정·선택 원문은 `product-decisions.md` 「2026-10-31 그림책 만들기 개편」, 업체·법률 확인 항목은 `pending-decisions.md`.
-- 브랜치 `claude/book-creator-todo`(main `414203a`에서 생성). **아직 커밋·push·PR 하지 않았다.** 운영 DB/R2 변경 없음.
+- 브랜치 `claude/book-creator-todo`(main `414203a`에서 생성). 구현 커밋 `585db94`를 `qudcks1940` 포크에 push하고 [PR #36](https://github.com/yonghwan86/wiggle_web/pull/36)을 제출했다(사용자 지시 "커밋·PR 올려줘"). 병합·배포 전이며 운영 DB/R2 변경 없음. 이 클론에는 `wwwiggle/new_wiggle` 원격이 없어 그쪽 동기화는 하지 않았다.
 - 구현
   - 1·8번: `template: "back"`(뒷표지)·`"pattern"`(면지) 양식, 쪽 목록 이름표, 표지 앞뒤 고정, 「책 구성 갖추기」(빠진 면지·작가의 말·속표지·뒷표지만 추가), 속표지 제목·지은이 자동 채움, 「표지 펼쳐 보기」. 인쇄 표지 PDF에 뒷표지(왼쪽)·책등 글자(제목 + 앞표지 지은이) 추가, `PRINT_LAYOUT_VERSION` 3(준비된 옛 인쇄 PDF는 다시 준비).
   - 2번: `storybook_ebook_links` 표, `/ebook/<토큰>` 보기(PC 펼침·좁은 화면 한 쪽, 넘김·키보드·스와이프·전체 화면), 작가·담임만 / 담임이 보호자 동의 기록 후 공유, 새 링크로 바꾸기, 완성 화면(ebook·링크 복사·PDF), 교사 목록에 ebook 보기와 만드는 중인 책 목록. `/ebook`·`/api/ebook`에 가족 공유와 같은 보안 헤더.
