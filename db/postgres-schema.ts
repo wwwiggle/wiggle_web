@@ -7,7 +7,9 @@
  */
 
 export const postgresSetupStatements = [
-  `CREATE SCHEMA IF NOT EXISTS web`,
+  // 운영 역할(wiggle_web)은 DB에 새 스키마를 만들 권한이 없고, web은 미리 만들어 그 역할에 맡겨 둔다.
+  // CREATE SCHEMA IF NOT EXISTS도 권한부터 검사하므로 없을 때만 만든다(로컬·테스트용).
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'web') THEN CREATE SCHEMA web; END IF; END $$`,
   // SQLite CURRENT_TIMESTAMP와 같은 'YYYY-MM-DD HH:MM:SS'(UTC) 텍스트. 어댑터가 호출부의 CURRENT_TIMESTAMP를 이것으로 바꾼다.
   `CREATE OR REPLACE FUNCTION web.sqlite_now() RETURNS text LANGUAGE sql STABLE AS \$\$ SELECT to_char(timezone('UTC', now()), 'YYYY-MM-DD HH24:MI:SS') \$\$`,
 ];

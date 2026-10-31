@@ -9,7 +9,9 @@
 - **테스트.** `npm run test:postgres` = 내장 Postgres 17(`embedded-postgres`, Docker 불필요, 윈도·맥 공통)을 띄워 전체 테스트를 Postgres로 돌린다. 테스트 DB마다 데이터베이스를 새로 만든다. SQLite 전용 테스트 2개 파일(`turso-adapters`, `legacy-migration`)과 MVP3 옛 스키마 업그레이드 1건은 건너뛴다. 실패 원인 볼 때 `WIGGLE_TEST_SERVER_LOG=<폴더>`로 서버 기록을 남긴다. 테스트 준비 코드의 SQLite 전용 문법(트리거·`datetime`·`strftime`·`INSERT OR IGNORE`·`PRAGMA`)은 두 DB에서 돌게 고쳤다.
 - **이사 스크립트** `scripts/migrate-turso-to-postgres.mjs`: Turso는 SELECT만, 부모→자식 순서로 옮기고 표마다 행 수·내용 해시를 비교한다. 대상에 행이 있으면 멈춘다(리허설 재실행만 `--truncate-target`). 값은 출력하지 않는다.
 - 검증(Node 25.5.0 — `.nvmrc` 22.23.2가 이 맥에 없음): typecheck 통과, lint 오류 0(기존 경고 14), production build. **Turso 전체 445/445**, **Postgres 전체 435/435 + 건너뜀 1**. 이사 스크립트를 로컬 개발 DB 사본(43표, 260행)으로 리허설 → 내장 Postgres로 옮겨 43표 모두 행 수·해시 일치, 비어 있지 않은 대상에서 멈춤 확인.
-- 남은 일: ① Supabase 개발 프로젝트에 `web` 스키마·전용 DB 역할(search_path=web) 만들기 ② 운영 Turso 자격증명(Vercel에만 있음)으로 개발 Supabase에 리허설 ③ Vercel Preview에서 `DATABASE_URL`로 실제 화면 확인 ④ 수업 없는 시간에 운영 이사·전환 ⑤ 며칠 뒤 Turso 길 제거. 운영 데이터·Vercel 설정은 아직 건드리지 않았다.
+- **Supabase 개발 준비(2026-11-01).** `kkumtle-book-dev`에 전용 역할 `wiggle_web`(로그인, `search_path = web, public`, `postgres`가 멤버)과 그 역할이 소유한 `web` 스키마를 만들었다. 이 역할은 DB에 새 스키마를 만들 수 없어 `CREATE SCHEMA IF NOT EXISTS`도 권한 오류가 난다 → 스키마는 없을 때만 만드는 DO 블록으로 바꿨다. 연결 주소(풀러 6543, 트랜잭션 모드)는 맥의 `.env.local`에 `# vercel-only:` 주석으로만 둔다. 운영 프로젝트에도 같은 역할·스키마를 만들어야 한다.
+- 실제 Supabase 리허설: 로컬 개발 DB 사본(43표·260행) → 개발 Supabase `web`, 43표 모두 행 수·해시 일치(3초). 앱 어댑터로 풀러 연결 확인: `provisionSchema` 1.1초, 일반 쿼리 약 12ms(맥→서울), batch 트랜잭션·meta.changes 정상.
+- 남은 일: ① ~~Supabase 개발 프로젝트에 `web` 스키마·전용 DB 역할 만들기~~(끝) ② 운영 Turso 자격증명(Vercel에만 있음)으로 개발 Supabase에 리허설 ③ Vercel Preview에서 `DATABASE_URL`로 실제 화면 확인 ④ 수업 없는 시간에 운영 이사·전환 ⑤ 며칠 뒤 Turso 길 제거. 운영 데이터·Vercel 설정은 아직 건드리지 않았다.
 - 남은 위험: 실제 브라우저 확인은 하지 않았다(테스트는 실제 HTTP 서버로 돌았다). 연결 풀러(Supavisor)에서의 동작·지연은 ②③에서 처음 확인된다. SQLite와 Postgres는 NULL 정렬 순서가 다르다(ASC에서 SQLite는 앞, Postgres는 뒤) — 테스트에서 드러난 곳은 없었다.
 
 ## 2026-10-31 저장소 이전 — `wwwiggle/wiggle_web` 단일 저장소
