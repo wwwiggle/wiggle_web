@@ -141,12 +141,16 @@ legend small { color:var(--primary-dark); }
 .shape-kind-row button { min-height:44px; min-width:44px; border:2px solid var(--soft-border); border-radius:11px; background:#fafefb; font-size:19px; font-weight:900; color:var(--ink); }
 .shape-kind-row button[aria-pressed=true] { border-color:var(--primary); background:#e9faeb; }
 .shape-kind-row .shape-more { border-style:dashed; color:var(--primary-dark); }
+.shape-kind-row.sticker-kind-row { grid-template-columns:repeat(5,minmax(44px,1fr)); }
+.sticker-kind-row button { font-size:24px; }
 .shape-fill-row { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
 .shape-fill-row button { min-height:44px; border:2px solid var(--soft-border); border-radius:11px; background:#fafefb; color:var(--ink); font-size:11px; font-weight:900; }
 .shape-fill-row button[aria-pressed=true] { border-color:var(--primary); background:#e9faeb; color:var(--primary-dark); }
 .shape-fill-row button:disabled { opacity:.4; }
 .text-tool-icon { font-family:Arial,sans-serif; font-size:20px!important; font-weight:900; letter-spacing:-.08em; }
 .text-object-selection { position:absolute; z-index:6; min-width:92px; min-height:52px; transform:translate(-50%,-50%); touch-action:none; cursor:grab; border:3px dashed #34b13f; border-radius:16px; background:rgba(233,250,235,.13); box-shadow:0 0 0 3px rgba(255,255,255,.72); color:#268a31; }
+.object-delete { position:absolute; z-index:7; display:grid; place-items:center; width:44px; height:44px; transform:translate(-50%,-50%); border:2px solid #f0b4ae; border-radius:50%; background:#fff; color:#c0392b; box-shadow:0 3px 10px rgba(70,55,20,.2); }
+.object-resize { border-color:#9cd4a2; color:#268a31; font-size:22px; font-weight:900; touch-action:none; cursor:nwse-resize; }
 .text-object-selection:active { cursor:grabbing; border-style:solid; background:rgba(233,250,235,.25); }
 .text-object-selection span { position:absolute; left:50%; top:-32px; transform:translateX(-50%); width:max-content; max-width:180px; padding:5px 9px; border:1px solid #9cd4a2; border-radius:999px; background:#fff; font-size:11px; font-weight:900; line-height:1.2; box-shadow:0 3px 10px rgba(39,79,47,.15); }
 .text-place-hint { color:#654d00; border-color:#dfbe3c; background:rgba(255,248,200,.97); }

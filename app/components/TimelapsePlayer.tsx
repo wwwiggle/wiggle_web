@@ -22,7 +22,9 @@ export function TimelapsePlayer({ document, onClose }: { document: DrawDocument;
     if (canvas.width !== size.width || canvas.height !== size.height) { canvas.width = size.width; canvas.height = size.height; renderedFrame.current = -1; renderedOps.current = null; }
     const context = canvas.getContext("2d"); if (!context) return;
     const canAdvanceOne = renderedOps.current === document.ops && renderedFrame.current + 1 === frame;
-    if (canAdvanceOne && document.ops[frame - 1]?.type !== "text") renderDrawOperation(context, document.ops[frame - 1], size);
+    // 글씨와, 도형·스티커를 옮기거나 지운 동작(objectId)은 앞 상태를 대신한다. 한 장만 덧그리면 옛 자리가 남으므로 처음부터 다시 그린다.
+    const next = document.ops[frame - 1];
+    if (canAdvanceOne && next && next.type !== "text" && !next.objectId) renderDrawOperation(context, next, size);
     else if (renderedOps.current !== document.ops || renderedFrame.current !== frame) {
       resetDrawingCanvas(context, size);
       renderDrawDocument(context, document.ops, size, frame);

@@ -1,4 +1,4 @@
-import { drawingTextGraphemes, drawnStrokeWidth, visibleDrawOperations, type DrawOp } from "@/lib/drawing-model";
+import { drawingTextGraphemes, drawnStrokeWidth, STICKER_SIZE, visibleDrawOperations, type DrawOp } from "@/lib/drawing-model";
 import { computeFloodFillMask, paintFloodFillMask, sampleRgb } from "@/lib/flood-fill";
 
 /* 도화지 크기. 숫자를 주면 예전처럼 정사각이고, 가로 도화지는 {width,height}를 준다.
@@ -10,7 +10,7 @@ function dimensions(size: RenderSize) {
   return typeof size === "number" ? { w: size, h: size } : { w: size.width, h: size.height };
 }
 
-const STICKER_EMOJI: Record<NonNullable<DrawOp["sticker"]>, string> = {
+export const STICKER_EMOJI: Record<NonNullable<DrawOp["sticker"]>, string> = {
   star: "⭐", heart: "❤️", leaf: "🍃", cloud: "☁️", sparkle: "✨",
 };
 
@@ -203,7 +203,7 @@ export function renderDrawOperation(context: CanvasRenderingContext2D, op: DrawO
   if (op.type === "text") { drawText(context, op, size, docH); return; }
   if (op.type === "sticker") {
     const center = op.points?.[0]; if (!center || !op.sticker) return;
-    context.save(); context.globalCompositeOperation = "source-over"; context.globalAlpha = 1; context.textAlign = "center"; context.textBaseline = "middle"; context.font = `${Math.round(140 * size / 1024)}px "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
+    context.save(); context.globalCompositeOperation = "source-over"; context.globalAlpha = 1; context.textAlign = "center"; context.textBaseline = "middle"; context.font = `${Math.round((op.fontSize ?? STICKER_SIZE) * size / 1024)}px "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
     context.fillText(STICKER_EMOJI[op.sticker], center.x * size, center.y * docH); context.restore(); return;
   }
   if (!op.points?.length) return;

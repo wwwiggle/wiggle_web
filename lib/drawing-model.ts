@@ -44,7 +44,7 @@ export function contentBounds(document: DrawDocument): { x: number; y: number; w
       if (point.y > bottom) bottom = point.y;
     }
     // 글자·스티커는 점 하나로 저장되므로 그 크기만큼 여유를 둔다.
-    const reach = op.type === "text" ? (op.fontSize ?? 64) * 1.2 : op.type === "sticker" ? 140 : (op.width ?? 0);
+    const reach = op.type === "text" ? (op.fontSize ?? 64) * 1.2 : op.type === "sticker" ? (op.fontSize ?? STICKER_SIZE) : (op.width ?? 0);
     if (reach > widest) widest = reach;
   }
   if (!found) return null;
@@ -74,6 +74,15 @@ export function clampDocumentHeight(rawHeight: number): number {
   return Math.max(DOCUMENT_MIN_HEIGHT, Math.min(DOCUMENT_MAX_HEIGHT, stepped));
 }
 export const STICKER_ALLOWLIST = ["star", "heart", "leaf", "cloud", "sparkle"] as const;
+/* 스티커 크기도 굵기·글자와 같은 도화지 단위다. 넓은 도화지(span)에서는 STICKER_SIZE를 span으로 나눈 값을
+ * `fontSize`에 담는다(렌더러가 스티커를 글자로 그린다). 값이 없으면 예전처럼 140이다. */
+export const STICKER_SIZE = 140;
+/* 아이가 바꿀 수 있는 스티커 크기(화면 기준 픽셀). 넓은 도화지에서는 저장 값이 span으로 나뉘므로
+ * 서버가 받는 범위는 가장 넓은 도화지의 최소부터 좁은 도화지의 최대까지다. */
+export const STICKER_SCREEN_MIN = 60;
+export const STICKER_SCREEN_MAX = 360;
+export const isStickerSize = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= STICKER_SCREEN_MIN / DOCUMENT_SPANS[DOCUMENT_SPANS.length - 1] - 0.01 && value <= STICKER_SCREEN_MAX;
 // 서버 validator와 클라이언트가 같은 목록을 봐야 한다. 클라이언트만 넓히면
 // 새 도구로 그린 문서가 서버에서 거부돼 저장이 영구 실패한다.
 // "pen"은 필압 렌더 도입 전의 기존 획이다. 기존 작품에는 실필압(0.5가 아닌 값)이 이미 기록돼
@@ -144,7 +153,7 @@ function opBytes(op: DrawOp) {
     + (op.opId?.length ?? 0) + (op.clientOpId?.length ?? 0) + (op.type?.length ?? 0)
     + (op.at?.length ?? 0) + (op.tool?.length ?? 0) + (op.color?.length ?? 0)
     + (op.shape?.length ?? 0) + (op.sticker?.length ?? 0)
-    + (op.textObjectId?.length ?? 0) + (op.textKind?.length ?? 0)
+    + (op.textObjectId?.length ?? 0) + (op.textKind?.length ?? 0) + (op.objectId?.length ?? 0)
     // UTF-8에서 한 UTF-16 code unit가 차지할 수 있는 양보다 넉넉하게 잡는다.
     + (op.text?.length ?? 0) * 6
     + (op.points?.length ?? 0) * POINT_BYTES;
@@ -195,6 +204,9 @@ export type DrawOp = {
   textKind?: TextKind;
   /* 글자 크기도 도화지 단위다 — 넓은 도화지(span)에서는 화면에서 같아 보이도록 TEXT_SIZES의 span배로 저장된다. */
   fontSize?: number;
+  /* 도형·스티커를 옮기거나 지운 동작이 가리키는 원래 물건. 처음 그린 동작에는 없고(그 동작의 opId가 곧 이름이다),
+   * 옮길 때마다 같은 objectId로 전체 상태를 새로 덧붙인다 — 글씨의 textObjectId와 같은 방식이다. */
+  objectId?: string;
   deleted?: boolean;
 };
 
@@ -258,21 +270,86 @@ export function normalizeDrawingText(value: string) {
     .trim();
 }
 
-// 텍스트 편집은 같은 textObjectId의 전체 상태를 새 op로 덧붙인다. 마지막 상태만 그리면
+/** 고쳐 쓸 수 있는 물건(글씨·도형·스티커)의 이름. 획·채우기는 물건이 아니라 undefined다.
+ *  종류를 앞에 붙여, 글씨 이름과 도형 이름이 우연히 같아도 서로를 가리지 않게 한다. */
+export function drawObjectKey(op: DrawOp) {
+  if (op.type === "text") return op.textObjectId ? `text:${op.textObjectId}` : undefined;
+  if (op.type === "shape" || op.type === "sticker") return `object:${op.objectId ?? op.opId}`;
+  return undefined;
+}
+
+// 물건 편집은 같은 이름의 전체 상태를 새 op로 덧붙인다. 마지막 상태만 그리면
 // 이동·크기·색 변경도 되돌리기와 타임랩스에 남고, 삭제 op를 지우면 직전 상태가 복구된다.
 export function visibleDrawOperations(ops: readonly DrawOp[], limit = ops.length) {
   const end = Math.max(0, Math.min(ops.length, limit));
-  const latestText = new Map<string, number>();
+  const latest = new Map<string, number>();
   for (let index = 0; index < end; index += 1) {
-    const op = ops[index];
-    if (op.type === "text" && op.textObjectId) latestText.set(op.textObjectId, index);
+    const key = drawObjectKey(ops[index]);
+    if (key) latest.set(key, index);
   }
   const visible: DrawOp[] = [];
   for (let index = 0; index < end; index += 1) {
     const op = ops[index];
-    if (op.type !== "text" || (latestText.get(op.textObjectId ?? "") === index && !op.deleted)) visible.push(op);
+    const key = drawObjectKey(op);
+    if (!key || (latest.get(key) === index && !op.deleted)) visible.push(op);
   }
   return visible;
+}
+
+/** 물건이 도화지에서 차지하는 칸(0~1). 도형은 두 점의 상자, 스티커는 가운데 점 둘레의 정사각이다. */
+export function drawObjectBounds(op: DrawOp, docHeight: number) {
+  const points = op.points ?? [];
+  if (!points.length) return null;
+  const reach = op.type === "sticker" ? (op.fontSize ?? STICKER_SIZE) / 2 : (op.width ?? 0) / 2;
+  const padX = reach / DOCUMENT_SIZE, padY = reach / docHeight;
+  const xs = points.map((point) => point.x), ys = points.map((point) => point.y);
+  const left = Math.min(...xs) - padX, top = Math.min(...ys) - padY;
+  return { x: left, y: top, width: Math.max(...xs) + padX - left, height: Math.max(...ys) + padY - top };
+}
+
+/** 지금 옮길 수 있는 도형·스티커(그려지는 순서).
+ *  **채우기를 한 뒤에는 그 전에 그린 것을 옮기지 못한다.** 채우기는 저장된 색이 아니라 "그 자리에서 번지기"라
+ *  다시 그릴 때마다 계산된다 — 동그라미를 그리고 안을 채운 뒤 동그라미를 옮기면, 번질 때 막아 주던 선이
+ *  사라져 색이 도화지 전체로 번진다. */
+export function movableDrawObjects(ops: readonly DrawOp[]) {
+  const firstIndex = new Map<string, number>();
+  let lastFill = -1;
+  ops.forEach((op, index) => {
+    if (op.type === "fill") lastFill = index;
+    const key = drawObjectKey(op);
+    if (key && !firstIndex.has(key)) firstIndex.set(key, index);
+  });
+  return visibleDrawOperations(ops).filter((op) => (op.type === "shape" || op.type === "sticker") && (firstIndex.get(drawObjectKey(op) ?? "") ?? -1) > lastFill);
+}
+
+// 이보다 작게 줄이면 다시 누르기 어렵다(도형 그리기가 받는 최소 길이 0.012보다 넉넉하게).
+const SHAPE_MIN_SPAN = 0.03;
+/** 물건을 가운데 기준으로 factor배 한 상태. 스티커는 크기(fontSize)가, 도형은 두 점이 바뀐다 — 선 굵기는 그대로다.
+ *  도화지 밖으로 나가거나 너무 작아지지 않는 만큼만 바뀐다. */
+export function scaleDrawObject(op: DrawOp, factor: number, span: number): Pick<DrawOp, "points" | "fontSize"> {
+  if (!Number.isFinite(factor) || factor <= 0) return {};
+  if (op.type === "sticker") {
+    const size = (op.fontSize ?? STICKER_SIZE) * factor;
+    return { fontSize: Math.max(toDocumentUnits(STICKER_SCREEN_MIN, span), Math.min(toDocumentUnits(STICKER_SCREEN_MAX, span), Math.round(size * 100) / 100)) };
+  }
+  const [a, b] = op.points ?? [];
+  if (op.type !== "shape" || !a || !b) return {};
+  const centerX = (a.x + b.x) / 2, centerY = (a.y + b.y) / 2;
+  const halfX = Math.abs(a.x - b.x) / 2, halfY = Math.abs(a.y - b.y) / 2;
+  const length = Math.hypot(a.x - b.x, a.y - b.y);
+  const most = Math.min(halfX ? Math.min(centerX, 1 - centerX) / halfX : Infinity, halfY ? Math.min(centerY, 1 - centerY) / halfY : Infinity);
+  const least = length > SHAPE_MIN_SPAN ? SHAPE_MIN_SPAN / length : 1;
+  const applied = Math.max(least, Math.min(most, factor));
+  const scaled = (point: Point) => ({ ...point, x: roundUnit(Math.max(0, Math.min(1, centerX + (point.x - centerX) * applied))), y: roundUnit(Math.max(0, Math.min(1, centerY + (point.y - centerY) * applied))) });
+  return { points: [scaled(a), scaled(b)] };
+}
+
+/** 물건을 (dx, dy)만큼 옮긴 점들. 점이 도화지 밖으로 나가지 않는 만큼만 움직인다. */
+export function shiftDrawPoints(points: readonly Point[], dx: number, dy: number): Point[] {
+  const xs = points.map((point) => point.x), ys = points.map((point) => point.y);
+  const moveX = Math.max(-Math.min(...xs), Math.min(1 - Math.max(...xs), dx));
+  const moveY = Math.max(-Math.min(...ys), Math.min(1 - Math.max(...ys), dy));
+  return points.map((point) => ({ ...point, x: roundUnit(point.x + moveX), y: roundUnit(point.y + moveY) }));
 }
 
 export function activeTextObjects(ops: readonly DrawOp[]) {
@@ -313,7 +390,11 @@ export function validateDrawDocument(value: unknown): DrawDocument | null {
       if (!op.shape || !SHAPE_KINDS.includes(op.shape) || !isHexColor(op.color) || !isStrokeWidth(op.width) || !Array.isArray(op.points) || op.points.length !== 2 || op.points.some(invalidPoint)) return null;
       if (op.filled !== undefined && typeof op.filled !== "boolean") return null;
     }
-    if (op.type === "sticker" && (!STICKER_ALLOWLIST.includes(op.sticker as (typeof STICKER_ALLOWLIST)[number]) || !Array.isArray(op.points) || op.points.length !== 1 || op.points.some(invalidPoint))) return null;
+    if (op.type === "sticker" && (!STICKER_ALLOWLIST.includes(op.sticker as (typeof STICKER_ALLOWLIST)[number]) || !Array.isArray(op.points) || op.points.length !== 1 || op.points.some(invalidPoint) || (op.fontSize !== undefined && !isStickerSize(op.fontSize)))) return null;
+    if (op.type === "shape" || op.type === "sticker") {
+      if (op.objectId !== undefined && (typeof op.objectId !== "string" || !/^[a-zA-Z0-9_-]{8,80}$/.test(op.objectId))) return null;
+      if (op.deleted !== undefined && typeof op.deleted !== "boolean") return null;
+    }
     if (op.type === "text") {
       if (typeof op.textObjectId !== "string" || !/^[a-zA-Z0-9_-]{8,80}$/.test(op.textObjectId)) return null;
       if (typeof op.text !== "string" || normalizeDrawingText(op.text) !== op.text) return null;
@@ -356,7 +437,11 @@ function normalizeOp(raw: DrawOp): DrawOp {
   }
   if (raw.type === "fill") { op.color = raw.color; op.points = points; }
   if (raw.type === "shape") { op.shape = raw.shape; op.color = raw.color; op.width = raw.width; op.points = points; if (raw.filled !== undefined) op.filled = raw.filled; }
-  if (raw.type === "sticker") { op.sticker = raw.sticker; op.points = points; }
+  if (raw.type === "sticker") { op.sticker = raw.sticker; op.points = points; if (raw.fontSize !== undefined) op.fontSize = raw.fontSize; }
+  if (raw.type === "shape" || raw.type === "sticker") {
+    if (raw.objectId !== undefined) op.objectId = raw.objectId;
+    if (raw.deleted !== undefined) op.deleted = raw.deleted;
+  }
   if (raw.type === "text") {
     op.textObjectId = raw.textObjectId;
     op.text = raw.text;
