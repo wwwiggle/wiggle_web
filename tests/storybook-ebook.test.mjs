@@ -86,7 +86,7 @@ test("HTTP ebook links: author and class teacher only, consent-gated sharing, ro
   assert.equal(pdfResponse.headers.get("content-type"), "application/pdf");
   assert.match(decodeURIComponent(pdfResponse.headers.get("content-disposition") ?? ""), /달빛 여행\.pdf/);
   const pdf = await PDFDocument.load(new Uint8Array(await pdfResponse.arrayBuffer()));
-  assert.equal(pdf.getPageCount(), 1);
+  assert.equal(pdf.getPageCount(), document.pages.length, "every page of the book (new books start with 24 structured pages)");
   assert.ok(Math.abs(pdf.getPage(0).getWidth() * 25.4 / 72 - 243) < .01 && Math.abs(pdf.getPage(0).getHeight() * 25.4 / 72 - 248) < .01);
 
   // Editing a shared book pauses the public view until it is complete again.
@@ -107,7 +107,7 @@ test("HTTP ebook links: author and class teacher only, consent-gated sharing, ro
   const second = (await (await server.fetch("/api/storybooks", { method: "POST", headers: other, body: "{}" })).json()).storybook.id;
   const list = await (await server.fetch("/api/teacher/storybooks?classroomId=eb_class", { headers: teacher })).json();
   assert.ok(list.storybooks.some(book => book.id === bookId));
-  assert.deepEqual(list.drafts.map(book => [book.id, book.pageCount]), [[second, 1]]);
+  assert.deepEqual(list.drafts.map(book => [book.id, book.pageCount]), [[second, 24]], "new books start with the full 24-page structure");
 
   // Archived students' books close for everyone.
   await server.DB.prepare("UPDATE student_profiles SET archived_at=CURRENT_TIMESTAMP WHERE id='eb_owner'").run();

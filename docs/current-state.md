@@ -1,5 +1,26 @@
 # Wiggle Web 현재 상태
 
+## 2026-11-01 그림책 편집기 최소화·책 뼈대 고정·패턴 면지 8장·책등 Ficture (같은 브랜치 `claude/book-order-quote`, PR #41)
+
+- 결정과 이유는 `product-decisions.md` 「2026-11-01 그림책 편집기 기능 최소화」에 있다.
+- 바뀐 코드
+  - `lib/storybook-model.ts`: 양식을 바꿀 때 손대지 않은 문구를 치운다.
+  - `lib/storybook-structure.ts`: `newStructuredStorybook`, 뒤 면지 없는 `completeBookStructure`, `isStructurePage`, `patternEightElements`·`replacePattern`, `BOOK_PUBLISHER`.
+  - `app/api/storybooks` POST: 새 책을 24쪽 뼈대로 만든다.
+  - `StorybookEditor`: 단추 정리, 끌어다 놓기, 패턴 면지 창, 기존 초안에 뼈대 자동 보충.
+  - 책등: `book-render.ts`의 `printPdfs`가 펴낸 곳을 아래쪽에 그린다. `StorybookCoverSpread`에도 보인다.
+- 검증
+  - 자동 검사: 전체 **450/450**, lint 오류 0(기존 경고 14), production build.
+  - 실제 브라우저에서 확인한 것
+    - 새 책이 24쪽(1 앞표지, 2 면지, 3 작가의 말, 4 속표지, 24 뒷표지)으로 열린다.
+    - 맨 위·도구줄 단추가 줄었다.
+    - 5쪽에 그림을 끌어다 놓으면 안내가 뜨고, 그림이 쪽 너비에 맞춰 들어간다.
+    - 패턴 면지 창에 그림을 놓으면 2쪽 면지로 옮겨 가고, 그림 8장이 생긴다.
+    - 표지 펼쳐 보기의 책등에 「달빛 여행 … Ficture」가 보인다.
+- 남은 위험
+  - 이미 완성된 책은 뼈대를 자동으로 더하지 않는다(만드는 중인 책만).
+  - 펴낸 곳 이름은 ISBN을 받게 되면 출판사 신고 이름과 맞춰야 한다.
+
 ## 2026-10-31 그림책 주문·견적서·입금 계좌 + 그림 그리기 유료 잠금 (브랜치 `claude/book-order-quote`)
 
 - 결정 원문과 흐름은 `product-decisions.md` 「2026-10-31 그림책 주문·견적서 구조」, 잠금 목록은 `docs/paid-features.md`, 남은 결정은 `pending-decisions.md`에 있다.

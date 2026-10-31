@@ -5,7 +5,7 @@ import { PDFDocument } from "pdf-lib";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { createCanvas } from "@napi-rs/canvas";
 import { applyStorybookTemplate, emptyStorybookDocument, STORYBOOK_TEMPLATE_LABELS, validateStorybookDocument } from "../lib/storybook-model.ts";
-import { applyPattern, canMovePage, completeBookStructure, coverCredit, ebookViews, hasBackCover, innerPageIndexes, newPageIndex, pageLabel, patternElements, spineFontSizeMm, spineLabel } from "../lib/storybook-structure.ts";
+import { applyPattern, BOOK_PUBLISHER, canMovePage, completeBookStructure, coverCredit, ebookViews, hasBackCover, innerPageIndexes, isStructurePage, newPageIndex, newStructuredStorybook, pageLabel, patternEightElements, patternElements, replacePattern, spineFontSizeMm, spineLabel } from "../lib/storybook-structure.ts";
 import { bookPrintProductForPages, estimatedSpineWidthMm, PRINT_LAYOUT_VERSION } from "../lib/book-print-format.ts";
 import { printPdfs, viewPdf } from "../lib/book-render.ts";
 import { validatePrintPdf } from "../lib/print-validation.ts";
@@ -52,9 +52,10 @@ test("book structure only adds missing parts in the standard order and never edi
   const before = structuredClone(document);
   const result = completeBookStructure(document, makeId, { title: "달빛 여행", credit: coverCredit(document) });
   assert.equal(result.error, "");
-  assert.deepEqual(result.added, ["앞 면지", "작가의 말", "속표지", "뒤 면지", "뒷표지"]);
+  // 2026-11-01: 앞표지 → 면지 → 작가의 말 → 속표지 → 내지 … → 뒷표지 (뒤 면지는 넣지 않는다)
+  assert.deepEqual(result.added, ["면지", "작가의 말", "속표지", "뒷표지"]);
   const pages = result.document.pages;
-  assert.deepEqual(pages.map(page => page.template ?? "inner"), ["cover", "pattern", "author", "title", "inner", "inner", "pattern", "back"]);
+  assert.deepEqual(pages.map(page => page.template ?? "inner"), ["cover", "pattern", "author", "title", "inner", "inner", "back"]);
   assert.deepEqual(pages[0], before.pages[0]);
   assert.deepEqual(pages[4], before.pages[1]);
   assert.deepEqual(pages[5], before.pages[2]);
@@ -73,11 +74,23 @@ test("book structure keeps an existing back cover last and respects the page lim
   document.pages[3] = applyStorybookTemplate(document.pages[3], "back", () => makeId("element"));
   const result = completeBookStructure(document, makeId, { title: "", credit: "" });
   assert.equal(result.document.pages.at(-1).id, document.pages[3].id);
-  assert.equal(result.document.pages.at(-2).template, "pattern");
+  assert.equal(result.document.pages.at(-2).id, document.pages[2].id, "기존 내지가 뒷표지 바로 앞에 그대로 있다");
   const full = book(130);
   const limited = completeBookStructure(full, makeId, { title: "", credit: "" }, 131);
   assert.match(limited.error, /최대 131쪽/);
   assert.equal(limited.document, full);
+});
+
+test("새 그림책은 처음부터 뼈대를 갖추고, 뼈대 쪽은 복제·삭제 대상이 아니다 (2026-11-01)", () => {
+  const document = newStructuredStorybook("squarebook-hc", makeId, 24);
+  assert.equal(document.pages.length, 24);
+  assert.deepEqual(document.pages.slice(0, 4).map(page => page.template), ["cover", "pattern", "author", "title"]);
+  assert.equal(document.pages.at(-1).template, "back");
+  assert.ok(document.pages.slice(4, -1).every(page => page.template === "inner"));
+  assert.ok(validateStorybookDocument(document));
+  assert.deepEqual(completeBookStructure(document, makeId, { title: "", credit: "" }).added, [], "이미 다 갖춘 책은 그대로");
+  assert.deepEqual(document.pages.map((_, index) => isStructurePage(document, index)), document.pages.map((_, index) => index < 4 || index === 23));
+  assert.equal(newPageIndex(document), 23, "새 쪽은 뒷표지 앞에 들어간다");
 });
 
 test("template autofill never overwrites text the child wrote", () => {
@@ -113,10 +126,30 @@ test("pattern endpaper: one picture repeated in a staggered grid, valid and insi
   assert.ok(validateStorybookDocument(document));
 });
 
+test("패턴 면지: 그림 한 장을 3·2·3 엇갈림으로 8장, 쪽 안에, 그림 비율 그대로", () => {
+  for (const imageAspect of [0.5, 1, 2]) {
+    const elements = patternEightElements({ assetId: "asset_pattern0001", imageAspect, pageAspect: 243 / 248, makeId: () => makeId("element") });
+    assert.equal(elements.length, 8);
+    for (const element of elements) {
+      assert.ok(element.x >= 0 && element.y >= 0 && element.x + element.width <= 1.0001 && element.y + element.height <= 1.0001, JSON.stringify(element));
+      assert.ok(Math.abs(element.width * (243 / 248) / element.height - imageAspect) < 0.01, "비율 유지");
+    }
+    assert.deepEqual([...new Set(elements.map(element => element.y))].length, 3, "세 줄");
+  }
+  const page = { id: "page_pattern001", background: "#FFF6E3", template: "pattern", elements: [
+    { id: "element_oldimage1", type: "image", assetId: "asset_old0000001", x: .1, y: .1, width: .2, height: .2, rotation: 0, zIndex: 1, opacity: 1, locked: false },
+    { id: "element_text00001", type: "text", text: "남는 글", x: .1, y: .8, width: .5, height: .1, rotation: 0, zIndex: 0, opacity: 1, locked: true },
+  ] };
+  const replaced = replacePattern(page, patternEightElements({ assetId: "asset_new0000001", imageAspect: 1, pageAspect: 1, makeId: () => makeId("element") }));
+  assert.ok(!replaced.elements.some(element => element.assetId === "asset_old0000001"), "이전 패턴 그림은 바뀐다");
+  assert.ok(replaced.elements.some(element => element.text === "남는 글"));
+});
+
 test("spine text and width follow page count; thin spines stay plain", () => {
   const document = book(2);
   document.pages[0] = applyStorybookTemplate(document.pages[0], "cover", () => makeId("element"));
-  assert.deepEqual(spineLabel(" 달빛 여행 ", document), { title: "달빛 여행", author: "" });
+  assert.deepEqual(spineLabel(" 달빛 여행 ", document), { title: "달빛 여행", author: "", publisher: "Ficture" });
+  assert.equal(BOOK_PUBLISHER, "Ficture");
   document.pages[0].elements.find(element => element.textRole === "credit").text = "글 / 그림 봄이";
   assert.equal(spineLabel("달빛 여행", document).author, "글 / 그림 봄이");
   assert.equal(estimatedSpineWidthMm(10), 10);
@@ -156,7 +189,7 @@ async function pdfText(bytes) {
 test("print cover: back cover on the left, front on the right, title and author on the spine", async () => {
   const colors = ["#ff0000", "#00ff00", "#0000ff"];
   const images = await Promise.all(colors.map(background => sharp({ create: { width: 243, height: 248, channels: 3, background } }).jpeg().toBuffer()));
-  const result = await printPdfs(images, spec, size, "달빛 여행", { backCover: true, spine: { title: "달빛 여행", author: "글 / 그림 봄이" } });
+  const result = await printPdfs(images, spec, size, "달빛 여행", { backCover: true, spine: { title: "달빛 여행", author: "글 / 그림 봄이", publisher: "Ficture" } });
   const front = await sample(result.cover, 1, .75, .5), back = await sample(result.cover, 1, .25, .5);
   assert.ok(front[0] > 240 && front[1] < 10 && front[2] < 10, "front cover = first page");
   assert.ok(back[2] > 240 && back[0] < 10 && back[1] < 10, "back cover = last page");
@@ -165,7 +198,7 @@ test("print cover: back cover on the left, front on the right, title and author 
   assert.ok(afterInner.every(value => value > 250), "the back cover is not repeated inside");
   assert.equal(result.addedPages, 23);
   const spineText = (await pdfText(result.cover)).replace(/\s+/g, "");
-  assert.ok(spineText.includes("달빛여행") && spineText.includes("봄이"), spineText);
+  assert.ok(spineText.includes("달빛여행") && spineText.includes("봄이") && spineText.includes("Ficture"), spineText);
   assert.equal((await validatePrintPdf(result.cover, "cover", { spec, size, pageCount: 24 })).length, 1);
   assert.equal((await validatePrintPdf(result.inner, "inner", { spec, size, pageCount: 24 })).length, 24);
 });
