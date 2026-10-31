@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test, { after } from "node:test";
 import { resetRows } from "./harness/db.mjs";
+import { PostgresD1 } from "../db/adapters/postgres-d1.ts";
 import { startTestServer } from "./harness/server.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
@@ -32,9 +33,33 @@ after(async () => {
 // 이 파일은 실패를 강제하려고 트리거를 만든다. 트리거는 행이 아니라 스키마라 resetRows가 지우지 않으므로
 // 다음 테스트로 새지 않게 여기서 먼저 떨어뜨린다.
 async function resetDatabase(DB) {
-  const triggers = await DB.prepare(`SELECT name FROM sqlite_master WHERE type = 'trigger'`).all();
-  for (const trigger of triggers.results) await DB.prepare(`DROP TRIGGER IF EXISTS "${trigger.name}"`).run();
+  if (DB instanceof PostgresD1) {
+    const triggers = await DB.sql`SELECT trigger_name AS name, event_object_table AS "table" FROM information_schema.triggers WHERE trigger_schema = 'web' GROUP BY 1, 2`;
+    for (const trigger of triggers) await dropTrigger(DB, trigger.name, trigger.table);
+  } else {
+    const triggers = await DB.prepare(`SELECT name FROM sqlite_master WHERE type = 'trigger'`).all();
+    for (const trigger of triggers.results) await DB.prepare(`DROP TRIGGER IF EXISTS "${trigger.name}"`).run();
+  }
   await resetRows(DB);
+}
+
+/* 실패를 강제하는 트리거. abort는 문장을 실패시키고(SQLite RAISE(ABORT)), ignore는 그 행만 조용히 건너뛴다(RAISE(IGNORE)).
+ * Postgres는 트리거 함수가 따로 있어야 해 문장이 둘이다. */
+function triggerStatements(DB, name, timing, table, mode) {
+  if (!(DB instanceof PostgresD1)) {
+    const raise = mode === "abort" ? "RAISE(ABORT, 'forced device session failure')" : "RAISE(IGNORE)";
+    return [DB.prepare(`CREATE TRIGGER ${name} ${timing} ON ${table} BEGIN SELECT ${raise}; END`)];
+  }
+  const body = mode === "abort" ? "RAISE EXCEPTION 'forced device session failure'" : "RETURN NULL";
+  return [
+    DB.prepare(`CREATE OR REPLACE FUNCTION ${name}_fn() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN ${body}; END $$`),
+    DB.prepare(`CREATE TRIGGER ${name} ${timing} ON ${table} FOR EACH ROW EXECUTE FUNCTION ${name}_fn()`),
+  ];
+}
+
+async function dropTrigger(DB, name, table) {
+  if (!(DB instanceof PostgresD1)) return DB.prepare(`DROP TRIGGER ${name}`).run();
+  await DB.sql.unsafe(`DROP TRIGGER IF EXISTS ${name} ON ${table}; DROP FUNCTION IF EXISTS ${name}_fn()`).simple();
 }
 
 function joinRequest(ip = "203.0.113.40") {
@@ -48,7 +73,7 @@ function joinRequest(ip = "203.0.113.40") {
 
 /* 선생님이 미리 만들어 둔 빈 자리. 아이는 이 자리를 차지할 뿐 프로필을 새로 만들지 않는다. */
 function seatRow(DB, classroomId, id = "student_seat1") {
-  return DB.prepare(`INSERT INTO student_profiles(id, classroom_id, seat_number, real_name, entry_code, claimed_at, nickname, animal, last_activity_at) VALUES (?, ?, 1, '김민준', '1234', NULL, '1번', '❔', strftime('%Y-%m-%dT%H:%M:%fZ','now'))`).bind(id, classroomId);
+  return DB.prepare(`INSERT INTO student_profiles(id, classroom_id, seat_number, real_name, entry_code, claimed_at, nickname, animal, last_activity_at) VALUES (?, ?, 1, '김민준', '1234', NULL, '1번', '❔', ?)`).bind(id, classroomId, new Date().toISOString());
 }
 
 async function count(DB, table) {
@@ -63,7 +88,7 @@ test("a failed device-session insert rolls back the entire join and a retry crea
   await DB.batch([
     DB.prepare("INSERT INTO teachers(id, email, display_name) VALUES ('teacher_atomic', 'atomic@example.com', 'Atomic')"),
     DB.prepare("INSERT INTO classrooms(id, teacher_id, display_name, class_code, join_token) VALUES ('class_atomic', 'teacher_atomic', '원자성 반', '4999', 'join_atomic')"),
-    DB.prepare("CREATE TRIGGER fail_device_session BEFORE INSERT ON device_sessions BEGIN SELECT RAISE(ABORT, 'forced device session failure'); END"),
+    ...triggerStatements(DB, "fail_device_session", "BEFORE INSERT", "device_sessions", "abort"),
   ]);
   await seatRow(DB, "class_atomic").run();
 
@@ -77,7 +102,7 @@ test("a failed device-session insert rolls back the entire join and a retry crea
   assert.equal((await DB.prepare("SELECT claimed_at AS claimedAt FROM student_profiles").first()).claimedAt, null);
   assert.equal(await count(DB, "device_sessions"), 0);
 
-  await DB.prepare("DROP TRIGGER fail_device_session").run();
+  await dropTrigger(DB, "fail_device_session", "device_sessions");
   const retried = await server.fetch("/api/student", joinRequest());
   assert.equal(retried.status, 201);
   const payload = await retried.json();
@@ -115,7 +140,7 @@ test("join returns 403 without residue when the atomic classroom guard loses", a
   ]);
   await seatRow(DB, "class_race").run();
   // 자리 차지는 INSERT가 아니라 UPDATE다 — 가드가 지는 상황을 UPDATE 트리거로 흉내 낸다.
-  await DB.prepare("CREATE TRIGGER close_class_before_join BEFORE UPDATE ON student_profiles BEGIN SELECT RAISE(IGNORE); END").run();
+  await DB.batch(triggerStatements(DB, "close_class_before_join", "BEFORE UPDATE", "student_profiles", "ignore"));
 
   const response = await server.fetch("/api/student", joinRequest("203.0.113.41"));
   assert.equal(response.status, 403);
@@ -140,7 +165,7 @@ test("re-entry returns 403 when the atomic active-class guard loses", async (con
   assert.equal(joined.status, 201);
   await DB.batch([
     DB.prepare("UPDATE device_sessions SET revoked_at = CURRENT_TIMESTAMP"),
-    DB.prepare("CREATE TRIGGER close_class_before_session BEFORE INSERT ON device_sessions BEGIN SELECT RAISE(IGNORE); END"),
+    ...triggerStatements(DB, "close_class_before_session", "BEFORE INSERT", "device_sessions", "ignore"),
   ]);
 
   const recovered = await server.fetch("/api/student", joinRequest("203.0.113.44"));

@@ -1,5 +1,129 @@
 # Wiggle Web 현재 상태
 
+## 2026-11-01 Vercel 자동 배포 끊김 복구·운영 배포 (`70cccea`)
+
+- 증상: 저장소 이전 뒤 main에 들어온 #40·#41·#39·#42·#43 병합과 사용자의 문서 커밋(`70cccea`)이 하나도 배포되지 않았다. GitHub 커밋 상태·배포 기록에 Vercel 반응이 없었고 운영은 `5ba702c`(10-31 13:01 UTC 배포)에 머물렀다.
+- 확인(Vercel CLI 64.5.0, 사용자 계정 로그인 — 대시보드는 브라우저 사이트 권한으로 막혀 CLI를 썼다)
+  - 프로젝트 `wiggle-web`(Hobby, `yonghwan86s-projects`)의 Git 연결은 `wwwiggle/wiggle_web`·운영 브랜치 `main`·자동 배포 켜짐으로 보였다. `vercel git connect`도 "이미 연결됨"이었다.
+  - 마지막 정상 배포 3건의 메타데이터는 저장소 주인이 `yonghwan86`이다 — 이전은 그 직후였고, 그 뒤 GitHub 푸시 알림이 프로젝트에 닿지 않았다.
+  - API로 만든 미리보기 배포는 조직 저장소에서 코드를 정상으로 가져왔다(빌드는 아래 Preview 환경 변수 때문에 실패).
+- 조치(사용자 지시 "재연결하고 배포해"): `vercel git disconnect` → `vercel git connect https://github.com/wwwiggle/wiggle_web`, 그다음 main `70cccea`를 Git 소스로 운영 배포 → READY. `www.kkumtle.app`·`kkumtle.app`·`wiggleweb.vercel.app`이 새 배포를 가리킨다. 직전 운영 배포(`5ba702c`)는 Vercel에 남아 있어 되돌릴 수 있다.
+- 운영 스모크: `/`·`/student` 200, `/teacher`·구글 로그인 시작 307, 학생 API 지원 안 하는 요청 400·없는 수업 코드 404(정상 문구), 리전 icn1.
+- 남은 확인
+  - 재연결 뒤 **자동** 배포는 다음 main 커밋에서 확인한다(이 PR 병합이 첫 확인).
+  - #39(DB 겸용 코드)가 저장 경로를 건드려 `check-deployed` 운영 실측이 필요하다 — 검증용 학생이 생기므로 사용자 확인 뒤.
+  - Vercel Preview 환경의 `WIGGLE_DATA_ENV`가 `production`이라, 코드의 안전장치("preview 실행 환경의 WIGGLE_DATA_ENV는 'preview'여야 해요")에 걸려 미리보기 빌드가 실패한다. Preview용 DB를 정하는 `preview/supabase` 작업 때 함께 정한다.
+- 이 클론을 `vercel link`하자 CLI가 `.env.local`에 `VERCEL_OIDC_TOKEN` 활성 줄을 만들었다. 규칙대로 `# vercel-only:` 주석으로 바꿨다. 다른 기기에서 `vercel link`·`vercel env pull`을 쓰면 같은 일이 생긴다.
+- PR #38(`claude/security-deps-entry-lock`)에 main `70cccea`를 병합해 충돌(`CLAUDE.md`·이 문서)을 풀었다. 새로 더한 `rate_limits` 조회·`substr` 삭제는 #39의 Postgres 어댑터(`?`→`$n`, bigint→number)로도 그대로 돈다. 검증: production build 포함 **457/457**, typecheck, lint 오류 0(경고 14), 운영 의존성 감사 심각·높음 0(보통 9 exceljs).
+
+## 2026-11-01 「내 그림」 칸 전체 유료 잠금 (같은 브랜치, PR #41)
+
+- 사용자 지시: "내 그림에 있는 모든 부분이 유료 기능으로 금지 표시가 되어야해. 새 그림 그리기 내 마음 그림 모두 다"
+- 바뀐 것
+  - 학생 「그림 자리」의 새 그림 그리기, 그리는 중·완성 그림 카드, 「내 그림 모두 보기」를 모두 잠금 표시로 바꿨다. 누를 수 없고, 마우스를 올리면 금지 표시가 뜬다.
+  - 보관함 `/student/archive`와 완성 그림 보기 `/student/archive/<id>`는 주소로 들어와도 잠금 화면이 나온다.
+- 검증
+  - 자동 검사: 전체 450/450, `tests/book-orders.test.mjs`에 보관함 잠금 검사 추가.
+  - 실제 브라우저(그림 5장 있는 학생): 카드 4장과 「모두 보기」가 모두 잠긴 span이고 금지 커서가 뜬다. 그림판·보관함 링크는 0개다.
+
+## 2026-11-01 그림책 편집기 최소화·책 뼈대 고정·패턴 면지 8장·책등 Ficture (같은 브랜치 `claude/book-order-quote`, PR #41)
+
+- 결정과 이유는 `product-decisions.md` 「2026-11-01 그림책 편집기 기능 최소화」에 있다.
+- 바뀐 코드
+  - `lib/storybook-model.ts`: 양식을 바꿀 때 손대지 않은 문구를 치운다.
+  - `lib/storybook-structure.ts`: `newStructuredStorybook`, 뒤 면지 없는 `completeBookStructure`, `isStructurePage`, `patternEightElements`·`replacePattern`, `BOOK_PUBLISHER`.
+  - `app/api/storybooks` POST: 새 책을 24쪽 뼈대로 만든다.
+  - `StorybookEditor`: 단추 정리, 끌어다 놓기, 패턴 면지 창, 기존 초안에 뼈대 자동 보충.
+  - 책등: `book-render.ts`의 `printPdfs`가 펴낸 곳을 아래쪽에 그린다. `StorybookCoverSpread`에도 보인다.
+- 검증
+  - 자동 검사: 전체 **450/450**, lint 오류 0(기존 경고 14), production build.
+  - 실제 브라우저에서 확인한 것
+    - 새 책이 24쪽(1 앞표지, 2 면지, 3 작가의 말, 4 속표지, 24 뒷표지)으로 열린다.
+    - 맨 위·도구줄 단추가 줄었다.
+    - 5쪽에 그림을 끌어다 놓으면 안내가 뜨고, 그림이 쪽 너비에 맞춰 들어간다.
+    - 패턴 면지 창에 그림을 놓으면 2쪽 면지로 옮겨 가고, 그림 8장이 생긴다.
+    - 표지 펼쳐 보기의 책등에 「달빛 여행 … Ficture」가 보인다.
+- 남은 위험
+  - 이미 완성된 책은 뼈대를 자동으로 더하지 않는다(만드는 중인 책만).
+  - 펴낸 곳 이름은 ISBN을 받게 되면 출판사 신고 이름과 맞춰야 한다.
+
+## 2026-10-31 그림책 주문·견적서·입금 계좌 + 그림 그리기 유료 잠금 (브랜치 `claude/book-order-quote`)
+
+- 결정 원문과 흐름은 `product-decisions.md` 「2026-10-31 그림책 주문·견적서 구조」, 잠금 목록은 `docs/paid-features.md`, 남은 결정은 `pending-decisions.md`에 있다.
+
+**새로 만든 것**
+- 표 `book_orders`(`lib/operations-schema.ts`, `db/schema.ts`). 금융 기록이라 학급을 지워도 남도록 `classroom_id`에 외래키를 걸지 않았다.
+- 서버 코드
+  - `lib/book-order-pricing.ts`: 견적 계산. 화면 미리 계산과 서버가 같이 쓴다.
+  - `lib/book-orders.ts`: 주문·견적·상태·설정.
+- API
+  - `/api/teacher/book-orders`: GET 목록·가격, POST 주문·취소.
+  - `/api/book-orders/[id]`: 견적서. 주문한 교사와 운영자만 본다.
+  - `/api/admin/book-orders`: 주문 목록·상태·메모·가격과 계좌 설정.
+- 화면
+  - `TeacherBookOrderDesk`: 주문 화면.
+  - `BookOrderQuote`: 견적서. 계좌·금액 복사, 인쇄 또는 PDF 저장.
+  - `AdminBookOrders`: 관리자 화면 첫 탭.
+  - 기존 제작 요청 화면은 `/books/print-request`로 옮겼다.
+
+**그림 그리기 잠금**
+- `lib/feature-locks.ts`의 `DRAWING_LOCKED`로 켠다.
+- 화면은 `PaidLock`과 `DrawingLocked`가 막는다: 학생 「그림 자리」, 보관함, 완성 그림 상세, 그림책 편집기의 「그림 그리러 가기」, `/student/draw/*`, 선생님 「오늘 수업」 학생 그림 칸.
+- 쓰기 API 5곳은 403 `DRAWING_LOCKED`를 돌려준다.
+- 그림·그림책이 없는 학생도 빈 도화지로 보내지 않는다.
+
+**바뀐 테스트**
+- 그림 진입 문자열을 그대로 대조하던 `student-art-desk`·`feedback-20260809` 테스트 4개를 잠금 조건에 맞게 고쳤다.
+- 새 테스트 `tests/book-orders.test.mjs`
+  - 견적 계산 단위 테스트.
+  - HTTP 흐름: 가격 설정 전 차단, 운영자만 설정, 잘못된 주문 거절, 멱등, 견적 금액·계좌·입금자명, 실명 미포함, 가격을 바꿔도 견적 유지, 상태 흐름, 교사 취소, 그림 쓰기 API 403, 그림책 생성 유지, 그림판 잠금 화면.
+
+**검증**
+- 자동 검사: production build, 전체 **447/447 테스트**, typecheck, lint 오류 0(기존 경고 14), `git diff --check`.
+- 실제 브라우저: `next start`(로컬 DB, 시험용 관리자 이메일 `ADMIN_EMAILS`)에서 아래 흐름을 확인했다.
+  - 관리자 가격·계좌 저장 → 교사 주문 화면에서 3종 4권 주문. 미리 본 금액 136,800원 = 견적서 금액.
+  - 견적서: 계좌, 입금자명, 공급가액·부가세.
+  - 관리자 「입금 확인」 → 견적서 상태가 바뀐다.
+  - 학생 「그림 자리」의 잠금 카드: 금지 커서가 뜨고, 눌러도 이동하지 않으며, 그림판 링크가 0개다.
+  - `/student/draw/new` 잠금 화면, 선생님 「오늘 수업」 잠금 칸.
+  - 320×568·390×844·844×390에서 가로 넘침이 없다.
+- 실제 기기(iPad·갤럭시 탭)와 운영 환경은 아직 확인하지 않았다.
+
+**남은 위험**
+- 가격·계좌를 관리자 화면에서 넣기 전에는 선생님이 주문할 수 없다(안내 문구가 보인다).
+- 입금 확인 후 실제 발주는 아직 운영자가 손으로 한다.
+- 개발용 `/student/books/demo`는 그림 저장 API를 쓰므로 잠긴 동안 동작하지 않는다.
+
+## 2026-10-31 DB Turso → Supabase 이사 1단계: 두 DB 모두 도는 코드 (`claude/supabase-db`, 로컬 검증)
+
+- **방식.** `DATABASE_URL`(Postgres)이 있으면 Supabase, 없으면 지금처럼 Turso(`db/adapters/database.ts`). 운영 전환 = Vercel에 `DATABASE_URL` 넣기, 되돌리기 = 지우기. 이사가 끝나면 Turso 길을 걷어 낸다.
+- **어댑터** `db/adapters/postgres-d1.ts`(postgres.js 3.4.9, 연결 풀러용 `prepare: false`). 호출부 281곳의 D1 API·SQLite SQL을 그대로 두고, 퍼져 있는 차이만 한곳에서 바꾼다: `?`→`$n`, `CURRENT_TIMESTAMP`→`sqlite_now()`(같은 'YYYY-MM-DD HH:MM:SS' 텍스트), camelCase 별칭 따옴표, `CHAR(n)`→`chr(n)`, `datetime(x)`·`datetime('now','-N minutes')`, `json_array_length/json_extract(x,'$.k')`, `x IS NOT 2`, `? IS NULL` 타입, 결과 true/false→1/0·bigint→number, batch=트랜잭션, meta.changes=영향 행 수. 오류에는 깨진 SQL(값 없이)을 붙인다.
+- **호출부 수정(두 DB 공통 문법).** `INSERT OR IGNORE` 9곳 → `INSERT … ON CONFLICT DO NOTHING`. `strftime(…,'now')` 3곳 → JS `new Date().toISOString()` 바인딩. `COLLATE NOCASE` → `lower()`. Postgres가 거부하는 `GROUP BY` 2곳(관리자 학급 목록, 교사 메시지)에 칸을 더했다.
+- **스키마** `db/postgres-schema.ts`: SQLite 최종 스키마(테이블 43개, 인덱스 포함)를 옮겼다. INTEGER→BIGINT, 시각 칸은 TEXT 유지. `provisionSchema`가 Postgres면 이것을 세우고 SQLite 업그레이드 분기(PRAGMA·ALTER)는 타지 않는다. `tests/postgres-schema.test.mjs`가 두 스키마의 표·칸 구성이 같은지 지킨다 — **SQLite에 칸을 더하면 여기에도 더해야 한다.**
+- **테스트.** `npm run test:postgres` = 내장 Postgres 17(`embedded-postgres`, Docker 불필요, 윈도·맥 공통)을 띄워 전체 테스트를 Postgres로 돌린다. 테스트 DB마다 데이터베이스를 새로 만든다. SQLite 전용 테스트 2개 파일(`turso-adapters`, `legacy-migration`)과 MVP3 옛 스키마 업그레이드 1건은 건너뛴다. 실패 원인 볼 때 `WIGGLE_TEST_SERVER_LOG=<폴더>`로 서버 기록을 남긴다. 테스트 준비 코드의 SQLite 전용 문법(트리거·`datetime`·`strftime`·`INSERT OR IGNORE`·`PRAGMA`)은 두 DB에서 돌게 고쳤다.
+- **이사 스크립트** `scripts/migrate-turso-to-postgres.mjs`: Turso는 SELECT만, 부모→자식 순서로 옮기고 표마다 행 수·내용 해시를 비교한다. 대상에 행이 있으면 멈춘다(리허설 재실행만 `--truncate-target`). 값은 출력하지 않는다.
+- 검증(Node 25.5.0 — `.nvmrc` 22.23.2가 이 맥에 없음): typecheck 통과, lint 오류 0(기존 경고 14), production build. **Turso 전체 445/445**, **Postgres 전체 435/435 + 건너뜀 1**. 이사 스크립트를 로컬 개발 DB 사본(43표, 260행)으로 리허설 → 내장 Postgres로 옮겨 43표 모두 행 수·해시 일치, 비어 있지 않은 대상에서 멈춤 확인.
+- **Supabase 개발 준비(2026-11-01).** `kkumtle-book-dev`에 전용 역할 `wiggle_web`(로그인, `search_path = web, public`, `postgres`가 멤버)과 그 역할이 소유한 `web` 스키마를 만들었다. 이 역할은 DB에 새 스키마를 만들 수 없어 `CREATE SCHEMA IF NOT EXISTS`도 권한 오류가 난다 → 스키마는 없을 때만 만드는 DO 블록으로 바꿨다. 연결 주소(풀러 6543, 트랜잭션 모드)는 맥의 `.env.local`에 `# vercel-only:` 주석으로만 둔다. 운영 프로젝트에도 같은 역할·스키마를 만들어야 한다.
+- 실제 Supabase 리허설: 로컬 개발 DB 사본(43표·260행) → 개발 Supabase `web`, 43표 모두 행 수·해시 일치(3초). 앱 어댑터로 풀러 연결 확인: `provisionSchema` 1.1초, 일반 쿼리 약 12ms(맥→서울), batch 트랜잭션·meta.changes 정상.
+- 남은 일: ① ~~Supabase 개발 프로젝트에 `web` 스키마·전용 DB 역할 만들기~~(끝) ② 운영 Turso 자격증명(Vercel에만 있음)으로 개발 Supabase에 리허설 ③ Vercel Preview에서 `DATABASE_URL`로 실제 화면 확인 ④ 수업 없는 시간에 운영 이사·전환 ⑤ 며칠 뒤 Turso 길 제거. 운영 데이터·Vercel 설정은 아직 건드리지 않았다.
+- 남은 위험: 실제 브라우저 확인은 하지 않았다(테스트는 실제 HTTP 서버로 돌았다). 연결 풀러(Supavisor)에서의 동작·지연은 ②③에서 처음 확인된다. SQLite와 Postgres는 NULL 정렬 순서가 다르다(ASC에서 SQLite는 앞, Postgres는 뒤) — 테스트에서 드러난 곳은 없었다.
+
+## 2026-10-31 저장소 이전 — `wwwiggle/wiggle_web` 단일 저장소
+
+- 사용자 지시: "이제 깃허브 저장소를 옮겨서 https://github.com/wwwiggle/wiggle_web.git 여기야. 여기서 작업 새로 할거거든? 환경을 조금씩 다 바꿨어."
+- 저장소 이전 확인 결과
+  - `yonghwan86/wiggle_web`과 `wwwiggle/wiggle_web`의 저장소 ID가 1308176523으로 같다. 복사가 아니라 GitHub 이전이다.
+  - 이전 직후 `main`은 `5ba702c`이고, PR #33·#35·#36(그림책 만들기 개편)이 병합된 상태다.
+  - Vercel Production 배포 기록이 같은 저장소에 이어진다.
+  - `wwwiggle/new_wiggle`은 보관(archived) 처리됐다.
+- 규칙 변경
+  - `CLAUDE.md` 「프로젝트 경계」·「배포」를 단일 저장소 기준으로 고쳤다. 기능 브랜치는 `origin`에 바로 push하고 PR을 연다.
+  - 양쪽 동기화 규칙과 포크 경유 PR은 은퇴시켰다.
+- 앞으로 할 일
+  - 저장소 안의 환경·DB 코드(`.env.example`, `db/`, `lib/runtime/`)는 이전으로 바뀐 것이 없다.
+  - 사용자가 말한 환경 변경은 Vercel·Turso·R2 같은 외부 설정 쪽으로 보이며, 무엇이 바뀌었는지는 아직 확인하지 않았다.
+  - 운영 자격증명을 쓰는 작업 전에는 사용자에게 무엇이 바뀌었는지 확인한다.
+
 ## 2026-10-31 보안 의존성 업데이트·참여 코드 찍기 방어 (`claude/security-deps-entry-lock`, 검증 완료)
 
 - 사용자 지시: 전체 점검에서 나온 "1·2번 고쳐줘"(① 취약한 의존성 ② 참여 코드 찍어 맞추기). PR #33·#35·#36 병합 후 main `5ba702c`에서 시작했다.
@@ -2378,3 +2502,4 @@ typecheck·lint(오류 0), `npm test` 323/324(실패 1은 Node 22.13 환경 문�
 - **고침.** 저장소에 `.nvmrc`(`22.23.2`)를 두고, 이 맥에 이미 설치돼 있던 22.23.2로 맞췄다. 테스트 코드나 검증 내용은 **한 글자도 바꾸지 않았다** — 고정 벡터(100k PBKDF2-SHA256), `crypto.subtle` 금지, `server-only` 표식 단언이 모두 그대로다.
 - **결과.** 플래그 없이 `npm test` **418/418 통과**(빌드 포함). 종전에는 417/418 + 플래그가 필요했다.
 - **보안.** 22.13.0(2025-01)에서 22.23.2로 올리면 그 사이 Node 보안 릴리스가 함께 들어온다. 낮은 버전에서 플래그로 우회하는 쪽은 테스트는 돌지만 런타임은 낡은 채로 남는다 — 그래서 우회가 아니라 버전을 맞췄다.
+- 2026-11-01 운영 배포 (#40 #41 #39)

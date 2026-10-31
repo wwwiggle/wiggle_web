@@ -1,7 +1,9 @@
 import { operationsSchema } from "@/lib/operations-schema";
 import { bookProductionSchema } from "@/lib/book-production-schema";
 import { createArtworksStore } from "@/db/adapters/artworks-store";
-import { createTursoD1 } from "@/db/adapters/turso-d1";
+import { createDatabase } from "@/db/adapters/database";
+import { PostgresD1 } from "@/db/adapters/postgres-d1";
+import { postgresSchemaStatements, postgresSetupStatements } from "@/db/postgres-schema";
 import { upgradeMvp3Schema } from "@/lib/mvp3-schema-upgrade";
 import { runtimeEnvironment } from "@/lib/runtime/environment";
 
@@ -18,7 +20,7 @@ export function bindings(): WiggleEnv {
     // 어댑터는 D1/R2에서 실제로 쓰는 표면만 구현한다. 전체 인터페이스 타입은
     // 호출부 38곳의 제네릭 시그니처를 보존하기 위해 여기서 한 번만 좁혀 단언한다.
     cachedEnv = {
-      DB: createTursoD1(environment) as unknown as D1Database,
+      DB: createDatabase(environment) as unknown as D1Database,
       ARTWORKS: createArtworksStore(environment) as unknown as R2Bucket,
     };
   }
@@ -153,6 +155,8 @@ async function ensureArtworkMutationPrimaryKey(DB: D1Database) {
 // 스키마 생성을 DB 인자로 분리해 두면 통합 테스트가 자기 DB에 같은 스키마를 세울 수 있다.
 // ensureSchema()는 프로세스당 한 번만 도는 캐시 래퍼일 뿐, 내용은 이 함수가 정본이다.
 export async function provisionSchema(DB: D1Database) {
+  // Postgres(Supabase)는 처음부터 최종 모양으로 세운다. 아래 SQLite 업그레이드 분기(PRAGMA·ALTER)는 Turso 운영 DB의 옛 모양을 위한 것이다.
+  if (DB instanceof PostgresD1) return provisionPostgresSchema(DB);
   await DB.batch(schemaStatements.map((statement) => DB.prepare(statement)));
   await DB.batch(bookProductionSchema.map((statement) => DB.prepare(statement)));
   await DB.batch(operationsSchema.map((statement) => DB.prepare(statement)));
@@ -194,6 +198,13 @@ export async function provisionSchema(DB: D1Database) {
   await backfillEntryCodes(DB);
   await DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS students_classroom_entry_code_uq ON student_profiles(classroom_id, entry_code) WHERE entry_code IS NOT NULL AND archived_at IS NULL`).run();
   await ensureArtworkMutationPrimaryKey(DB);
+}
+
+async function provisionPostgresSchema(DB: PostgresD1) {
+  await DB.sql.begin(async (tx) => {
+    for (const statement of [...postgresSetupStatements, ...postgresSchemaStatements]) await tx.unsafe(statement);
+  });
+  await backfillEntryCodes(DB as unknown as D1Database);
 }
 
 /* 아이별 참여 코드 네 자리(2026-09-12 사용자 결정, 종전 여섯 자리에서 줄임).

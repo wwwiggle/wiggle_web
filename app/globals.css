@@ -2404,3 +2404,13 @@ body {
   .studio-body>.grimi-panel .grimi-own-name { padding:6px 8px; font-size:13px; }
   .studio-body>.grimi-panel .grimi-send { font-size:15px; }
 }
+
+/* 유료 요금제로 잠긴 기능(2026-10-31). 누를 수 없고, 올리면 금지 표시가 뜬다. lib/feature-locks.ts */
+.paid-lock{position:relative;cursor:not-allowed!important;user-select:none;-webkit-user-select:none;filter:grayscale(.85);opacity:.6}
+.paid-lock *{pointer-events:none;cursor:not-allowed!important}
+.paid-lock-badge{display:inline-flex;align-items:center;gap:4px;width:max-content;max-width:100%;margin-top:6px;padding:2px 10px;border-radius:999px;background:#3b3b3b;color:#fff;font-size:12px;font-weight:800;line-height:1.6;white-space:nowrap;filter:none}
+.paid-lock-screen{min-height:100dvh;display:grid;place-content:center;gap:14px;padding:24px;text-align:center;background:#fffaf0;color:#294329}
+.paid-lock-screen h1{margin:0;font-size:clamp(22px,4vw,30px)}
+.paid-lock-screen p{margin:0;font-size:16px;line-height:1.6}
+.paid-lock-screen .paid-lock-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:8px}
+.paid-lock-screen .paid-lock-actions .button{min-height:48px}

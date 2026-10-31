@@ -9,11 +9,11 @@
  */
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createTestDb } from "./db.mjs";
+import { createTestDb, testPostgresUrl } from "./db.mjs";
 
 const PROJECT_ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const READY_TIMEOUT_MS = 90_000;
@@ -50,6 +50,8 @@ async function waitForReady(origin, child, log) {
 export async function startTestServer({ env: extraEnv } = {}) {
   const workDir = await mkdtemp(path.join(tmpdir(), "wiggle-test-server-"));
   const databaseUrl = `file:${path.join(workDir, "server.db")}`;
+  // Postgres로 돌릴 때는 DB를 먼저 만들어 서버와 테스트가 같은 DB를 보게 한다(DATABASE_URL이 Turso보다 앞선다).
+  const postgresDb = testPostgresUrl ? await createTestDb() : null;
   const artworksDir = path.join(workDir, "artworks");
   const port = await freePort();
   // 호스트 이름을 localhost로 맞춘다. 127.0.0.1로 띄우면 서버가 계산하는 자기 출처와
@@ -71,6 +73,7 @@ export async function startTestServer({ env: extraEnv } = {}) {
         VERCEL_ENV: "",
         TURSO_DATABASE_URL: databaseUrl,
         TURSO_AUTH_TOKEN: "",
+        DATABASE_URL: postgresDb ? postgresDb.url : "",
         ARTWORKS_FS_DIR: artworksDir,
         // .env.local에 운영 R2 자격증명이 살아 있어도 테스트가 운영 버킷을 물지 않게 막는다.
         // Next는 process.env에 이미 있는 키를 .env.local로 덮어쓰지 않는다.
@@ -91,9 +94,10 @@ export async function startTestServer({ env: extraEnv } = {}) {
   let handle;
   try {
     await waitForReady(origin, child, log);
-    handle = await createTestDb({ url: databaseUrl });
+    handle = postgresDb ?? await createTestDb({ url: databaseUrl });
   } catch (cause) {
     child.kill("SIGKILL");
+    await postgresDb?.dispose().catch(() => {});
     await rm(workDir, { recursive: true, force: true }).catch(() => {});
     throw cause;
   }
@@ -108,9 +112,14 @@ export async function startTestServer({ env: extraEnv } = {}) {
       return fetch(new URL(pathname, origin), { ...init, headers });
     },
     async dispose() {
-      await handle.dispose().catch(() => {});
+      // 실패 원인을 볼 때: WIGGLE_TEST_SERVER_LOG=폴더 로 서버 기록을 남긴다.
+      if (process.env.WIGGLE_TEST_SERVER_LOG) {
+        await writeFile(path.join(process.env.WIGGLE_TEST_SERVER_LOG, `server-${port}.log`), log.join("")).catch(() => {});
+      }
+      // 서버를 먼저 끈다 — Postgres는 연결이 남아 있으면 테스트 DB를 지우기 어렵다.
       child.kill("SIGKILL");
       await new Promise((resolve) => child.once("exit", resolve));
+      await handle.dispose().catch(() => {});
       await rm(workDir, { recursive: true, force: true }).catch(() => {});
     },
   };

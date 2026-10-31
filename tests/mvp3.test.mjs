@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { createTestDb } from "./harness/db.mjs";
+import { createTestDb, testPostgresUrl } from "./harness/db.mjs";
 import {
   createFamilyHandoffInvite,
   createFamilyShare,
@@ -98,7 +98,8 @@ test("family shares fail closed without auditable guardian prior consent and sto
   } finally { await handle.dispose(); }
 });
 
-test("rejected early MVP3 schemas upgrade idempotently and invalidate unaudited legacy links", async () => {
+// 옛 Turso 운영 DB의 모양을 고치는 SQLite 전용 경로다. Postgres는 처음부터 최종 모양으로 세워 이 경로를 타지 않는다.
+test("rejected early MVP3 schemas upgrade idempotently and invalidate unaudited legacy links", { skip: testPostgresUrl ? "SQLite 전용 업그레이드" : false }, async () => {
   // 초기 MVP3 스키마를 그대로 재현해야 하므로 앱 스키마가 없는 빈 DB에서 시작한다.
   const handle = await createTestDb();
   const DB = handle.DB;

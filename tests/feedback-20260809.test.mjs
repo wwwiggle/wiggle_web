@@ -46,6 +46,9 @@ const stroke = (suffix) => ({
 
 const documentWith = (ops) => ({ schemaVersion: 1, rendererVersion: 1, size: 1024, ops });
 
+
+// 2026-08-09 00:00 + n분. SQLite datetime(…, '+n minutes')와 같은 모양을 JS에서 만든다(DB마다 날짜 함수가 달라서).
+const atMinute = (minute) => `2026-08-09 00:${String(minute).padStart(2, "0")}:00`;
 test("rapid undo and redo stay atomic, preserve mirror pairs, and new edits clear redo", () => {
   const first = stroke("first");
   const second = stroke("second");
@@ -130,8 +133,8 @@ test("teacher artwork history is ownership-scoped, newest-first, and paginated",
   const student = joinedData.student;
   const DB = server.DB;
   for (let index = 0; index < 13; index += 1) {
-    await DB.prepare(`INSERT INTO artworks(id, student_id, classroom_id, title, topic, learning_mode, status, updated_at) VALUES (?, ?, ?, ?, ?, 'guided', ?, datetime('2026-08-09 00:00:00', ?))`)
-      .bind(`history_${String(index).padStart(2, "0")}`, student.id, classroom.id, `작품 ${index}`, "고양이", index === 0 ? "drawing" : "complete", `+${index} minutes`).run();
+    await DB.prepare(`INSERT INTO artworks(id, student_id, classroom_id, title, topic, learning_mode, status, updated_at) VALUES (?, ?, ?, ?, ?, 'guided', ?, ?)`)
+      .bind(`history_${String(index).padStart(2, "0")}`, student.id, classroom.id, `작품 ${index}`, "고양이", index === 0 ? "drawing" : "complete", atMinute(index)).run();
   }
 
   const pageOne = await server.fetch(`/api/teacher?classroomId=${classroom.id}&studentId=${student.id}&historyOffset=0`, {
@@ -159,8 +162,8 @@ test("teacher artwork history is ownership-scoped, newest-first, and paginated",
   assert.equal(forbidden.status, 403);
 
   for (let index = 13; index < 45; index += 1) {
-    await DB.prepare(`INSERT INTO artworks(id, student_id, classroom_id, title, topic, learning_mode, status, updated_at) VALUES (?, ?, ?, ?, ?, 'guided', 'complete', datetime('2026-08-09 00:00:00', ?))`)
-      .bind(`history_${String(index).padStart(2, "0")}`, student.id, classroom.id, `작품 ${index}`, "고양이", `+${index} minutes`).run();
+    await DB.prepare(`INSERT INTO artworks(id, student_id, classroom_id, title, topic, learning_mode, status, updated_at) VALUES (?, ?, ?, ?, ?, 'guided', 'complete', ?)`)
+      .bind(`history_${String(index).padStart(2, "0")}`, student.id, classroom.id, `작품 ${index}`, "고양이", atMinute(index)).run();
   }
   const studentAuthHeaders = { ...studentHeaders, authorization: `Bearer ${joinedData.deviceToken}` };
   const archiveOne = await server.fetch("/api/student?artworkOffset=0", { headers: studentAuthHeaders });
@@ -233,7 +236,7 @@ test("the UI source keeps completion, archive, palette, help-choice and touch pr
      종전에는 그리다 만 그림을 **자동으로** 열었다 — 그러면 아이가 새 그림을 시작할 길이 없었다.
      이제 이어 그리기는 목록에서 아이가 직접 고른다. */
   // A teacher-imported PDF also counts as an existing work: keep its home/library reachable.
-  assert.match(studentEntry, /if \(!books\.storybooks\?\.length\) \{ location\.replace\("\/student\/draw\/new\?mode=free"\); return; \}/);
+  assert.match(studentEntry, /if \(!books\.storybooks\?\.length && !DRAWING_LOCKED\) \{ location\.replace\("\/student\/draw\/new\?mode=free"\); return; \}/);
   assert.match(studentEntry, /if \(data\) return <StudentArtDesk /);
   assert.doesNotMatch(studentEntry, /latestUnfinishedArtwork/, "그리던 그림을 자동으로 열면 안 된다");
   assert.match(archive, /setHasMore\(Boolean\(value\.artworkHasMore\)\)/);

@@ -1,0 +1,79 @@
+/* 그림책 주문 · 견적서 · 운영자 주문 처리(2026-10-31). 기본 틀은 book-workflow.css를 그대로 쓴다. */
+.book-order-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 24px;padding:0;list-style:none;counter-reset:order-step}
+.book-order-steps li{counter-increment:order-step;display:flex;align-items:center;gap:10px;min-height:56px;padding:10px 14px;border-radius:14px;background:#f2f6ef;color:#294329;font-weight:700;font-size:15px;line-height:1.35}
+.book-order-steps li::before{content:counter(order-step);flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#2f6b3a;color:#fff;font-size:14px}
+.book-order-desk .book-order-list>article{grid-template-columns:minmax(0,1fr) 84px auto;align-items:center}
+.book-order-desk .book-order-list>article.chosen{background:#f7fbf3}
+.book-order-desk .book-quantity input{min-height:44px;font-size:16px}
+.book-order-price{font-weight:700;white-space:nowrap;color:#3d5a44}
+.book-order-totals .total{padding-top:12px;border-top:2px solid #293846;font-size:17px!important}
+.book-order-totals .total dd{font-size:20px;color:#1f5a2c}
+.book-order-history{display:grid;gap:6px;padding:16px 0;border-top:1px solid #e5e8ea}
+.book-order-history>div{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.book-order-history p{margin:0}
+.book-order-status{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:800;background:#eef0f2;color:#38444f}
+.book-order-status.status-awaiting_deposit{background:#fff1c7;color:#5c4300}
+.book-order-status.status-paid,.book-order-status.status-producing{background:#e2f0ff;color:#123f6b}
+.book-order-status.status-shipped{background:#e3f4e4;color:#1d4d24}
+.book-order-status.status-canceled{background:#f3e3e3;color:#6b1f1f}
+.book-order-legacy{margin-top:8px;text-align:center}
+.book-order-legacy a{color:inherit;text-decoration:underline}
+@media(max-width:860px){.book-order-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.book-order-desk .book-order-list>article{grid-template-columns:minmax(0,1fr) 84px}.book-order-price{grid-column:1/-1}.book-order-steps li{font-size:14px;min-height:48px;padding:8px 10px}}
+
+/* 견적서 */
+.book-order-banner{margin:0 0 16px;padding:14px 18px;border-radius:14px;background:#fff6d6;color:#4d3a07;font-size:16px;line-height:1.6}
+.book-order-banner.status-canceled{background:#f7e4e4;color:#6b1f1f}
+.book-order-banner.status-paid,.book-order-banner.status-producing,.book-order-banner.status-shipped{background:#e7f3e5;color:#1d4d24}
+.book-quote-page .book-desk-header .button{margin-left:auto}
+.book-quote-sheet{max-width:860px;margin:0 auto;padding:40px 44px;background:#fff;border:1px solid #d9dde0;border-radius:6px;color:#1f2a33;font-size:15px;line-height:1.6;position:relative}
+.book-quote-sheet.canceled::after{content:"취소";position:absolute;top:28px;right:36px;padding:4px 16px;border:3px solid #b23b3b;border-radius:8px;color:#b23b3b;font-size:22px;font-weight:900;transform:rotate(8deg)}
+.book-quote-sheet h1{margin:0 0 20px;text-align:center;font-size:32px;letter-spacing:.4em}
+.book-quote-sheet h2{margin:0 0 8px;font-size:16px}
+.quote-meta{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 18px;padding-bottom:14px;border-bottom:2px solid #1f2a33}
+.quote-meta p{margin:0}
+.quote-parties{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:18px 0}
+.quote-parties section{padding:14px 16px;border:1px solid #d9dde0;border-radius:6px}
+.quote-parties p{margin:0}
+.quote-parties .quote-lead{margin-top:10px;color:#4d5964}
+.quote-parties dl,.quote-deposit dl{margin:0;display:grid;gap:4px}
+.quote-parties dl>div,.quote-deposit dl>div{display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px;align-items:center}
+.quote-parties dt,.quote-deposit dt{color:#5b6670}
+.quote-parties dd,.quote-deposit dd{margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.quote-sum{margin:0 0 12px;padding:12px 16px;background:#f3f6f8;border-radius:6px;font-size:17px}
+.quote-sum b{font-size:22px}
+.quote-table-scroll{overflow-x:auto}
+.quote-table{width:100%;min-width:560px;border-collapse:collapse;font-size:14px}
+.quote-table th,.quote-table td{padding:8px 10px;border:1px solid #d0d5d9;text-align:left;vertical-align:top}
+.quote-table thead th{background:#eef2f4;text-align:center}
+.quote-table td:nth-child(1),.quote-table td:nth-child(4){text-align:center;white-space:nowrap}
+.quote-table td:nth-child(5),.quote-table td:nth-child(6),.quote-table tfoot td{text-align:right;white-space:nowrap}
+.quote-table tfoot th{text-align:right;font-weight:600;background:#fafbfc}
+.quote-table tfoot .total th,.quote-table tfoot .total td{font-size:16px;font-weight:900;background:#eef2f4}
+.quote-deposit{margin:20px 0;padding:16px 18px;border:2px solid #2f6b3a;border-radius:8px;background:#f6fbf4}
+.quote-deposit b{font-size:17px}
+.quote-shipping p{margin:0}
+.quote-shipping{margin:16px 0}
+.quote-note{padding:10px 14px;background:#fafbfc;border-left:4px solid #9aa5ad;white-space:pre-wrap}
+.quote-footnote{margin:16px 0 0;color:#5b6670;font-size:13px}
+@media(max-width:680px){.book-quote-sheet{padding:22px 16px}.book-quote-sheet h1{font-size:26px}.quote-parties{grid-template-columns:1fr}.quote-parties dl>div,.quote-deposit dl>div{grid-template-columns:92px minmax(0,1fr)}}
+@media print{
+  @page{size:A4;margin:14mm}
+  body{background:#fff!important}
+  .quote-screen-only,.book-quote-page .book-desk-header{display:none!important}
+  .book-desk.book-quote-page{max-width:none;padding:0;margin:0}
+  .book-quote-sheet{border:0;padding:0;max-width:none;font-size:12px}
+  .quote-table{min-width:0;font-size:11px}
+  .quote-deposit{break-inside:avoid}
+}
+
+/* 운영 관리 · 그림책 주문 */
+.admin-book-orders .small-button.is-active{background:#293846;color:#fff;border-color:#293846}
+.admin-book-orders .admin-request-card .book-order-status{justify-self:start}
+.admin-order-items{margin:8px 0;padding-left:20px}
+.admin-order-settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;align-items:start}
+.admin-order-settings fieldset{margin:0;padding:16px;border:1px solid #e1e5e8;border-radius:14px;display:grid;gap:10px;min-width:0}
+.admin-order-settings legend{padding:0 6px;font-weight:800}
+.admin-order-settings>.button{grid-column:1/-1;justify-self:start;min-height:48px}
+.admin-money-input{display:flex;align-items:center;gap:8px}
+.admin-money-input input{flex:1;min-width:0}

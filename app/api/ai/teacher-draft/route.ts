@@ -1,3 +1,4 @@
+import { DRAWING_LOCKED, drawingLockedResponse } from "@/lib/feature-locks";
 import { bindings } from "@/db/runtime";
 import { bytesToDataUrl } from "@/lib/image-data";
 import { AIServiceError, requestStructuredOpenAI, TeacherCoachingDraft } from "@/lib/openai-coaching";
@@ -34,6 +35,8 @@ function aiError(error: unknown) {
 }
 
 export async function POST(request: Request) {
+  // 그림 그리기는 유료 요금제 기능으로 잠겨 있다(lib/feature-locks.ts). 읽기(GET)는 그림책·보관함이 쓰므로 그대로 둔다.
+  if (DRAWING_LOCKED) return drawingLockedResponse();
   if (!sameOrigin(request)) return jsonError("요청 출처를 확인할 수 없어요.", 403);
   const teacher = await requireTeacher(); if (!teacher) return jsonError("교사 로그인이 필요해요.", 401);
   const payload = await payloadOf(request); if (!payload) return jsonError("요청이 너무 커요.", 413);

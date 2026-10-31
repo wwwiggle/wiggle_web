@@ -85,9 +85,34 @@ test("모든 양식 전환은 기존 글·그림·PDF 배경을 보존하며 이
     assert.ok(validated.pages[0].elements.some(element => element.text === "학생이 이미 쓴 소중한 이야기"));
     assert.deepEqual(validated.pages[0].elements.find(element => element.id === originalImage.id), originalImage);
   }
+  // 마지막 양식(자유롭게)은 빈 이름 칸을 치우므로 앞표지 양식으로 돌아가 이름 칸을 다시 만든다.
+  document.pages[0] = applyStorybookTemplate(document.pages[0], "cover", () => `element_template${String(next++).padStart(8, "0")}`);
   const credit = document.pages[0].elements.find(element => element.textRole === "credit");
   credit.text = "글 / 그림 봄이"; credit.verticalAlign = "middle";
   assert.equal(validateStorybookDocument(document).pages[0].elements.find(element => element.id === credit.id).text, "글 / 그림 봄이");
+});
+
+test("양식을 바꾸면 손대지 않은 앞 양식 문구는 치우고 아이가 쓴 글만 남긴다 (2026-11-01)", () => {
+  let next = 0;
+  const makeId = () => `element_switch${String(next++).padStart(8, "0")}`;
+  const context = { title: "달빛 여행", credit: "글·그림 별" };
+  let page = emptyStorybookDocument().pages[0];
+  const texts = () => page.elements.filter(element => element.type === "text").map(element => `${element.textRole ?? "-"}:${element.text}`);
+  page = applyStorybookTemplate(page, "inner", makeId, context);
+  assert.deepEqual(texts(), ["story:"]);
+  page = applyStorybookTemplate(page, "title", makeId, context);
+  assert.deepEqual(texts(), ["title:달빛 여행", "credit:글·그림 별"]);
+  page = applyStorybookTemplate(page, "author", makeId, context);
+  assert.deepEqual(texts().sort(), ["heading:작가의 말", "story:"], "속표지의 자동 제목·지은이는 남지 않는다");
+  page = applyStorybookTemplate(page, "inner", makeId, context);
+  assert.deepEqual(texts(), ["story:"], "작가의 말 제목도 남지 않는다");
+  page = applyStorybookTemplate(page, "pattern", makeId, context);
+  assert.deepEqual(texts(), []);
+  page = applyStorybookTemplate(page, "author", makeId, context);
+  page.elements = page.elements.map(element => element.textRole === "story" ? { ...element, text: "내가 쓴 작가의 말" } : element);
+  page = applyStorybookTemplate(page, "title", makeId, context);
+  assert.ok(texts().some(value => value.endsWith("내가 쓴 작가의 말")), "아이가 쓴 글은 남는다");
+  assert.ok(!texts().includes("heading:작가의 말"));
 });
 
 test("기존 문서는 추가 필드 없이 동일한 좌표와 모든 텍스트를 왕복한다", () => {
