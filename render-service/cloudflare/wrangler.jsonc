@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // 그림책 그리기 서버(render-service)를 Cloudflare Containers로 돌리는 Worker.
+  // 이 Worker는 요청을 컨테이너로 넘기기만 한다. 인증(x-render-secret)·그리기는 컨테이너 안 render-service/server.ts가 한다.
+  // 배포는 GitHub Actions(.github/workflows/render-service.yml)가 main 반영 때 한다. Workers 유료 요금제가 있어야 한다.
+  "name": "wiggle-render",
+  "main": "worker.ts",
+  "compatibility_date": "2026-10-16",
+  "upload_source_maps": true,
+  "containers": [
+    {
+      "class_name": "RenderContainer",
+      // Dockerfile은 저장소 루트를 빌드 위치로 쓴다(lib·db·글꼴을 함께 담는다).
+      "image": "../Dockerfile",
+      "image_build_context": "../..",
+      // 그림책 한 권(그림 최대 80MB)을 그릴 메모리. 수업 시간 동시 요청을 생각해 3대까지.
+      "instance_type": "standard-1",
+      "max_instances": 3
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "RENDER", "class_name": "RenderContainer" }]
+  },
+  "exports": {
+    "RenderContainer": { "type": "durable-object", "storage": "sqlite" }
+  },
+  "vars": {
+    // 운영 그림 저장소를 읽는다. Preview용으로 따로 올릴 때는 둘 다 preview로 바꾼다.
+    "WIGGLE_APP_ENV": "production",
+    "WIGGLE_DATA_ENV": "production"
+  }
+  // 비밀 값(wrangler secret put): RENDER_SERVICE_SECRET, R2_S3_ENDPOINT, R2_S3_BUCKET, R2_S3_ACCESS_KEY_ID, R2_S3_SECRET_ACCESS_KEY
+}

@@ -1,0 +1,60 @@
+# 그림책 그리기 서버(render-service)를 GitHub가 대신 만들고(Docker), Cloudflare Containers에 올린다.
+# 누구의 컴퓨터에도 Docker가 필요 없게 하려는 것이다(2026-11-01 결정).
+#
+# - check: PR·main마다 이미지를 실제로 만들고 띄워 /health와 인증 거절을 확인한다. 키가 없어도 돈다.
+# - deploy: main 반영 때만. 저장소 변수 RENDER_DEPLOY_ENABLED=true이고 비밀 CLOUDFLARE_API_TOKEN·CLOUDFLARE_ACCOUNT_ID가 있을 때.
+#   Workers 유료 요금제가 있어야 Containers를 쓸 수 있어 그 전까지는 꺼 둔다.
+name: render-service
+
+on:
+  pull_request:
+    paths: ["render-service/**", "lib/**", "db/**", "public/fonts/**", "package.json", "package-lock.json", ".github/workflows/render-service.yml"]
+  push:
+    branches: [main]
+    paths: ["render-service/**", "lib/**", "db/**", "public/fonts/**", "package.json", "package-lock.json", ".github/workflows/render-service.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: 이미지 만들기
+        run: docker build -f render-service/Dockerfile -t wiggle-render .
+      - name: 띄워서 확인
+        run: |
+          docker run -d --name render -p 8080:8080 \
+            -e WIGGLE_APP_ENV=test -e ARTWORKS_FS_DIR=/tmp/artworks -e RENDER_SERVICE_SECRET=ci-secret wiggle-render
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8080/health && break; sleep 1; done
+          curl -sf http://127.0.0.1:8080/health | grep -q '"ok":true'
+          # 비밀 없는 요청은 401
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8080/pages -d '{}')" = "401"
+          # 비밀이 맞으면 입력 검사까지 간다(빈 문서 → 400)
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'x-render-secret: ci-secret' http://127.0.0.1:8080/pages -d '{}')" = "400"
+      - name: 실패하면 기록 보기
+        if: failure()
+        run: docker logs render || true
+
+  deploy:
+    needs: check
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.RENDER_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: render-service/cloudflare
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: npm ci --no-audit --no-fund
+      - name: Cloudflare에 올리기
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

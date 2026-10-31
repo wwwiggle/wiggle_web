@@ -1,5 +1,15 @@
 # Wiggle Web 현재 상태
 
+## 2026-11-01 그리기 서버 자동 빌드·배포 (`claude/render-deploy`)
+
+- 사용자 결정: Docker를 개인 컴퓨터에 깔지 않고 GitHub Actions가 이미지를 만들어 Cloudflare Containers에 올린다(네 명 누가 합쳐도 같은 배포).
+- `.github/workflows/render-service.yml`
+  - `check`(PR·main): `render-service/Dockerfile`로 이미지를 만들고 띄워 `/health` 200, 비밀 없는 요청 401, 빈 요청 400을 확인한다. 키·요금제 없이 돈다.
+  - `deploy`(main만): 저장소 변수 `RENDER_DEPLOY_ENABLED=true`와 비밀 `CLOUDFLARE_API_TOKEN`·`CLOUDFLARE_ACCOUNT_ID`가 있을 때 `wrangler deploy`. Workers 유료 요금제가 생기기 전까지 꺼 둔다.
+- `render-service/cloudflare/`: 요청을 컨테이너로 넘기는 Worker(`wiggle-render`)와 설정. 컨테이너는 `standard-1`, 최대 3대, 5분 쉬면 잠든다. Worker 비밀 값(`RENDER_SERVICE_SECRET`, `R2_S3_*`)을 컨테이너 환경 변수로 넘긴다. 따로 된 package.json(wrangler 4.151.1, @cloudflare/containers 0.3.7)이라 앱 의존성은 그대로다. 루트 tsconfig에서 제외.
+- `.dockerignore`: 빌드 위치(저장소 루트)에서 node_modules·.next·.data·.env 등을 뺀다.
+- 확인: Worker 타입 검사, `wrangler deploy --dry-run`은 설정 검사를 통과하고 Docker가 없어 멈춤(예상대로). 이미지 실제 빌드는 이 PR의 GitHub Actions `check`로 확인한다.
+
 ## 2026-11-01 운영 DB 전환(Turso → Supabase)과 동시 깨어남 충돌 수정 (`claude/schema-concurrency`)
 
 - **전환.** 새벽 3시(일요일) 점검 모드(`WIGGLE_MAINTENANCE=1`) 중 운영 Turso → 운영 Supabase `web` 최종 복사: 44표·21,723행, 9초, **44표 모두 행 수·해시 일치**. 용환님이 Vercel Production에 `DATABASE_URL`을 넣고 점검 변수를 지운 뒤 재배포했다. 직후 학생 그림책 저장이 Supabase에 쌓이는 것을 확인했다.

@@ -1,0 +1,9 @@
+# render-service/Dockerfile 빌드 위치는 저장소 루트다. 필요한 것만 보내 빌드를 빠르게 한다.
+**/node_modules
+.next
+.data
+.git
+work
+artifacts
+.env*
+!.env.example
