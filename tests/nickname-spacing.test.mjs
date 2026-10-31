@@ -168,9 +168,10 @@ test("한 학급에 코드를 반복해서 틀리면 그 IP는 학급 버킷에�
   const DB = server.DB;
   await seedClassroom(DB, "ratelimit", 1);
 
-  // 학급 + IP 한도는 60회/10분. 같은 IP에서 60번 틀리면 맞는 코드도 막힌다.
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    const failed = await server.fetch("/api/student", studentRequest({ action: "join", entry: "4321", entryCode: String(9000 + attempt) }, "203.0.113.90"));
+  // 틀린 시도 상한은 학급 + IP 20회/10분(2026-10-31). 기기 식별값을 매번 바꿔 기기 잠금을 피해도
+  // 같은 IP에서 20번 틀리면 맞는 코드도 막힌다.
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const failed = await server.fetch("/api/student", studentRequest({ action: "join", entry: "4321", entryCode: String(9000 + attempt), deviceKey: `rotating-${String(attempt).padStart(4, "0")}` }, "203.0.113.90"));
     assert.equal(failed.status, 404, `attempt ${attempt}`);
   }
   const blocked = await server.fetch("/api/student", studentRequest({ action: "join", entry: "4321", entryCode: "1111", animal: "🐰" }, "203.0.113.90"));

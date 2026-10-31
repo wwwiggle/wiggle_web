@@ -1,5 +1,5 @@
 import { bindings, ensureSchema } from "@/db/runtime";
-import { cleanText, clientIp, isLocalDemoRequest, jsonError, noStoreJson, randomToken, rateLimit, sameOrigin, sha256, studentFromRequest } from "@/lib/security";
+import { cleanText, clientIp, isLocalDemoRequest, jsonError, noStoreJson, randomToken, rateLimit, rateLimitReached, sameOrigin, sha256, studentFromRequest } from "@/lib/security";
 import { decayedStrikes, failLimitFor, lockMessage, lockRemainingSeconds, lockSecondsFor, normalizeDeviceKey } from "@/lib/entry-lockout";
 import { FALLBACK_NICKNAME, NICKNAME_IDEAS } from "@/lib/nickname-ideas";
 import { activityLabel, normalizeActivityKey } from "@/lib/lesson-content";
@@ -30,11 +30,36 @@ async function classroomForEntry(codeOrToken: string) {
 // 견딜 만큼 넉넉히 두고, 무차별 대입은 대상(학생·프로필) 단위 한도로 막는다.
 const IP_ENTRY_LIMIT = 180;
 const IP_ENTRY_WINDOW_SECONDS = 10 * 60;
-const CLASSROOM_JOIN_LIMIT = 60;
+// 맞게 들어오는 시도도 세는 상한이라, 한 반이 한꺼번에 들어오고 다시 여는 수업 시작에도 남게 둔다.
+// 찍어 맞추기는 아래의 틀린 시도 상한이 막는다(2026-10-31).
+const CLASSROOM_JOIN_LIMIT = 120;
+
+/* 틀린 시도만 세는 서버 쪽 상한(2026-10-31 점검). 기기 잠금은 브라우저가 보낸 식별값에 기대므로
+ * 값을 바꿔 가며 보내면 피할 수 있다. 수업 코드와 참여 코드가 모두 네 자리라 이 상한이 실제 방벽이다.
+ * 맞게 들어오는 아이는 이 계수를 쓰지 않는다. 참여 코드는 학급+IP 단위로 세서 학교 와이파이를 함께 쓰는
+ * 다른 반이 막히지 않게 하고, 선생님의 「입장 잠금 풀기」가 그 반 계수를 지운다. */
+const ENTRY_FAILURE_LIMITS = [
+  { seconds: 10 * 60, classCode: 30, seatCode: 20 },
+  { seconds: 24 * 60 * 60, classCode: 150, seatCode: 80 },
+] as const;
+type EntryFailureKind = "classCode" | "seatCode";
 
 const requestIp = clientIp;
 function entryRateKey(request: Request) { return `student-entry:${requestIp(request)}`; }
 function ipAllowed(request: Request) { return rateLimit(entryRateKey(request), IP_ENTRY_LIMIT, IP_ENTRY_WINDOW_SECONDS); }
+function entryFailureKey(kind: EntryFailureKind, scope: string, seconds: number) { return `entry-fail:${kind}:${scope}:${seconds}`; }
+async function entryFailuresBlocked(kind: EntryFailureKind, scope: string) {
+  for (const limit of ENTRY_FAILURE_LIMITS) if (await rateLimitReached(entryFailureKey(kind, scope, limit.seconds), limit[kind])) return true;
+  return false;
+}
+async function countEntryFailure(kind: EntryFailureKind, scope: string) {
+  for (const limit of ENTRY_FAILURE_LIMITS) await rateLimit(entryFailureKey(kind, scope, limit.seconds), limit[kind], limit.seconds);
+}
+const ENTRY_FAILURES_BLOCKED = "입장 코드를 너무 많이 틀렸어요. 선생님께 알려 주세요.";
+// 저장소를 못 쓰는 브라우저나 식별값을 빼고 보낸 요청도 기기 잠금을 받게, 없으면 IP로 대신한다.
+async function entryDeviceKey(request: Request, value: unknown) {
+  return normalizeDeviceKey(value) || `ip-${(await sha256(requestIp(request))).slice(0, 40)}`;
+}
 function presentedToken(request: Request) { return request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? ""; }
 
 export async function GET(request: Request) {
@@ -149,9 +174,14 @@ async function studentPost(request: Request) {
 
   if (action === "entryStatus") {
     if (!(await ipAllowed(request))) return jsonError("입장 확인이 많아요. 잠시 후 다시 해 주세요.", 429);
+    // 이 응답도 수업 코드가 있는지 알려 주므로 join과 같은 틀린 시도 상한을 받는다.
+    if (await entryFailuresBlocked("classCode", requestIp(request))) return jsonError(ENTRY_FAILURES_BLOCKED, 429);
     const entry = cleanText(payload.entry, 80);
     const classroom = await classroomForEntry(entry);
-    if (!classroom) return jsonError("수업 코드를 다시 확인해 주세요.", 404);
+    if (!classroom) {
+      await countEntryFailure("classCode", requestIp(request));
+      return jsonError("수업 코드를 다시 확인해 주세요.", 404);
+    }
     if (!classroom.admissionOpen) return jsonError("선생님이 입장을 열 때까지 기다려 주세요.", 403);
     const existing = await bindings().DB.prepare(`SELECT 1 FROM student_profiles WHERE classroom_id = ? AND archived_at IS NULL LIMIT 1`).bind(classroom.id).first();
     // 선생님이 명단을 만든 학급이면 아이는 자기 번호를 입력한다. 명단 자체(번호·이름 목록)는
@@ -199,11 +229,13 @@ async function studentPost(request: Request) {
   if (action === "join") {
     if (!(await ipAllowed(request))) return jsonError("입장 시도가 많아요. 잠시 후 다시 해 주세요.", 429);
     // 잠긴 기기는 코드를 맞게 넣어도 통과시키지 않는다. 맞는지 확인해 주는 것 자체가 찍기를 돕는다.
-    const deviceKey = normalizeDeviceKey(payload.deviceKey);
+    const deviceKey = await entryDeviceKey(request, payload.deviceKey);
     const lock = await lockState(deviceKey);
     if (lock.locked > 0) return noStoreJson({ error: lockMessage(lock.locked), code: "ENTRY_LOCKED", retryAfterSeconds: lock.locked }, { status: 429 });
+    if (await entryFailuresBlocked("classCode", requestIp(request))) return jsonError(ENTRY_FAILURES_BLOCKED, 429);
     const entry = cleanText(payload.entry, 80); const classroom = await classroomForEntry(entry);
     if (!classroom) {
+      await countEntryFailure("classCode", requestIp(request));
       const failure = await noteEntryFailure(deviceKey, null);
       if (failure.seconds) return noStoreJson({ error: lockMessage(failure.seconds), code: "ENTRY_LOCKED", retryAfterSeconds: failure.seconds }, { status: 429 });
       return noStoreJson({ error: "수업 코드를 다시 확인해 주세요.", code: "ENTRY_CODE", ...(failure.attemptsLeft ? { attemptsLeft: failure.attemptsLeft } : {}) }, { status: 404 });
@@ -220,8 +252,11 @@ async function studentPost(request: Request) {
     // 학급 상한은 IP와 함께 묶는다. 학급 단독 버킷은 한 클라이언트가 학급 전체를 잠그는 통로가 된다.
     // 네 자리 만 개 중 한 반 코드는 수십 개다. 학급+IP 버킷(60회/10분)이 찍어 맞추기를 막는다.
     if (!(await rateLimit(`student-join-class:${classroom.id}:${requestIp(request)}`, CLASSROOM_JOIN_LIMIT, IP_ENTRY_WINDOW_SECONDS))) return jsonError("이 수업의 입장 시도가 많아요. 선생님께 알려 주세요.", 429);
+    const seatScope = `${classroom.id}:${requestIp(request)}`;
+    if (await entryFailuresBlocked("seatCode", seatScope)) return jsonError(ENTRY_FAILURES_BLOCKED, 429);
     const seat = await bindings().DB.prepare(`SELECT id, nickname, animal, claimed_at AS claimedAt FROM student_profiles WHERE classroom_id = ? AND entry_code = ? AND archived_at IS NULL`).bind(classroom.id, entryCode).first<{ id: string; nickname: string; animal: string; claimedAt: string | null }>();
     if (!seat) {
+      await countEntryFailure("seatCode", seatScope);
       const failure = await noteEntryFailure(deviceKey, classroom.id);
       if (failure.seconds) return noStoreJson({ error: lockMessage(failure.seconds), code: "ENTRY_LOCKED", retryAfterSeconds: failure.seconds }, { status: 429 });
       return noStoreJson({ error: "참여 코드를 다시 확인해 주세요.", code: "ENTRY_CODE", ...(failure.attemptsLeft ? { attemptsLeft: failure.attemptsLeft } : {}) }, { status: 404 });

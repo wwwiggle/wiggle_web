@@ -1,5 +1,23 @@
 # Wiggle Web 현재 상태
 
+## 2026-11-01 Vercel 자동 배포 끊김 복구·운영 배포 (`70cccea`)
+
+- 증상: 저장소 이전 뒤 main에 들어온 #40·#41·#39·#42·#43 병합과 사용자의 문서 커밋(`70cccea`)이 하나도 배포되지 않았다. GitHub 커밋 상태·배포 기록에 Vercel 반응이 없었고 운영은 `5ba702c`(10-31 13:01 UTC 배포)에 머물렀다.
+- 확인(Vercel CLI 64.5.0, 사용자 계정 로그인 — 대시보드는 브라우저 사이트 권한으로 막혀 CLI를 썼다)
+  - 프로젝트 `wiggle-web`(Hobby, `yonghwan86s-projects`)의 Git 연결은 `wwwiggle/wiggle_web`·운영 브랜치 `main`·자동 배포 켜짐으로 보였다. `vercel git connect`도 "이미 연결됨"이었다.
+  - 마지막 정상 배포 3건의 메타데이터는 저장소 주인이 `yonghwan86`이다 — 이전은 그 직후였고, 그 뒤 GitHub 푸시 알림이 프로젝트에 닿지 않았다.
+  - API로 만든 미리보기 배포는 조직 저장소에서 코드를 정상으로 가져왔다(빌드는 아래 Preview 환경 변수 때문에 실패).
+- 조치(사용자 지시 "재연결하고 배포해"): `vercel git disconnect` → `vercel git connect https://github.com/wwwiggle/wiggle_web`, 그다음 main `70cccea`를 Git 소스로 운영 배포 → READY. `www.kkumtle.app`·`kkumtle.app`·`wiggleweb.vercel.app`이 새 배포를 가리킨다. 직전 운영 배포(`5ba702c`)는 Vercel에 남아 있어 되돌릴 수 있다.
+- 운영 스모크: `/`·`/student` 200, `/teacher`·구글 로그인 시작 307, 학생 API 지원 안 하는 요청 400·없는 수업 코드 404(정상 문구), 리전 icn1.
+- 남은 확인
+  - 재연결 뒤 **자동** 배포는 다음 main 커밋에서 확인한다(이 PR 병합이 첫 확인).
+  - #39(DB 겸용 코드)가 저장 경로를 건드려 `check-deployed` 운영 실측이 필요하다 — 검증용 학생이 생기므로 사용자 확인 뒤.
+  - Vercel Preview 환경의 `WIGGLE_DATA_ENV`가 `production`이라, 코드의 안전장치("preview 실행 환경의 WIGGLE_DATA_ENV는 'preview'여야 해요")에 걸려 미리보기 빌드가 실패한다. Preview용 DB를 정하는 `preview/supabase` 작업 때 함께 정한다.
+    Preview 환경 변수(`WIGGLE_DATA_ENV`·`TURSO_*`·`R2_S3_BUCKET` 등)가 69일 전부터 Production과 한 항목으로 묶여 운영 값을 가리킨다. `WIGGLE_DATA_ENV`만 `preview`로 바꾸면 미리보기가 운영 DB에 쓰게 되므로 그렇게 하지 않는다.
+  - 그때까지 임시로(사용자 지시 "우선 미리보기 꺼줘") Vercel 프로젝트의 **Ignored Build Step**을 `[ "$VERCEL_ENV" != "production" ]`로 두어 main 외 브랜치 빌드를 건너뛴다(API로 만든 시험 미리보기가 CANCELED로 끝남 확인). Preview DB를 붙이면 이 설정을 지운다(Vercel → Settings → Git, 또는 API 필드 `commandForIgnoringBuildStep`).
+- 이 클론을 `vercel link`하자 CLI가 `.env.local`에 `VERCEL_OIDC_TOKEN` 활성 줄을 만들었다. 규칙대로 `# vercel-only:` 주석으로 바꿨다. 다른 기기에서 `vercel link`·`vercel env pull`을 쓰면 같은 일이 생긴다.
+- PR #38(`claude/security-deps-entry-lock`)에 main `70cccea`를 병합해 충돌(`CLAUDE.md`·이 문서)을 풀었다. 새로 더한 `rate_limits` 조회·`substr` 삭제는 #39의 Postgres 어댑터(`?`→`$n`, bigint→number)로도 그대로 돈다. 검증: production build 포함 **457/457**, typecheck, lint 오류 0(경고 14), 운영 의존성 감사 심각·높음 0(보통 9 exceljs).
+
 ## 2026-11-01 「내 그림」 칸 전체 유료 잠금 (같은 브랜치, PR #41)
 
 - 사용자 지시: "내 그림에 있는 모든 부분이 유료 기능으로 금지 표시가 되어야해. 새 그림 그리기 내 마음 그림 모두 다"
@@ -107,6 +125,19 @@
   - 저장소 안의 환경·DB 코드(`.env.example`, `db/`, `lib/runtime/`)는 이전으로 바뀐 것이 없다.
   - 사용자가 말한 환경 변경은 Vercel·Turso·R2 같은 외부 설정 쪽으로 보이며, 무엇이 바뀌었는지는 아직 확인하지 않았다.
   - 운영 자격증명을 쓰는 작업 전에는 사용자에게 무엇이 바뀌었는지 확인한다.
+
+## 2026-10-31 보안 의존성 업데이트·참여 코드 찍기 방어 (`claude/security-deps-entry-lock`, 검증 완료)
+
+- 사용자 지시: 전체 점검에서 나온 "1·2번 고쳐줘"(① 취약한 의존성 ② 참여 코드 찍어 맞추기). PR #33·#35·#36 병합 후 main `5ba702c`에서 시작했다.
+- **의존성**: `next`·`eslint-config-next` 16.3.3 → **16.4.2**(next/og 원격 코드 실행·Draft Mode 노출 권고, 취약 범위 16.0.0~16.4.0). 16.4.3은 나온 지 8일이라 2주 넘은 16.4.2를 택했다. `sharp` 0.35.5(librsvg 권고), `npm audit fix`로 source-map-js·brace-expansion 등. 운영 의존성 감사가 심각 1·높음 3 → **0·0**. 남은 보통 9건은 exceljs 하위 의존성이며 고치려면 exceljs 3.4.0으로 내리는 깨지는 변경이라 두었다.
+- **참여 코드 찍기 방어**: 기기 잠금은 브라우저가 보낸 식별값에 기대서, 값을 빼거나 바꿔 가며 보내면 잠금이 걸리지 않았다(학급+IP 60회/10분만 남음 → 한 반 25자리 기준 약 1시간에 한 자리를 맞힐 수 있었다).
+  - 식별값이 없으면 IP에서 만든 키(`ip-…`)로 기기 잠금을 센다.
+  - **틀린 시도만** 세는 서버 상한을 더했다: 참여 코드는 학급+IP 20회/10분·80회/하루, 수업 코드는 IP 30회/10분·150회/하루. 상한에 닿으면 맞는 코드도 확인해 주지 않는다. `entryStatus`의 없는 수업 코드도 센다. 맞게 들어온 시도는 세지 않는다.
+  - 학급+IP 전체 시도 상한은 60 → 120회/10분으로 올려, 한 반이 한꺼번에 들어오는 학교 와이파이에서 정상 입장이 막히지 않게 했다.
+  - 선생님의 「입장 잠금 풀기」가 그 반 참여 코드 틀린 시도 계수도 지운다.
+- 검증: production build 포함 **450/450**(신규 `tests/entry-failure-limit.test.mjs` 5개 — 식별값 바꿔 찍기 차단, 다른 반·다른 IP 영향 없음, 성공은 계수 안 씀, 식별값 생략 시 기기 잠금, entryStatus 찍기 차단), typecheck, lint 오류 0(기존 경고 14), `git diff --check`. `next start -p 3299` 실제 브라우저 검사 320×568·390×844·844×390 OK 325·SKIP 1(기존 핀치 환경 사유).
+- 기존 테스트 2개를 새 규칙에 맞게 고쳤다: 식별값 없는 틀린 입장에 `attemptsLeft: 4`가 붙고(entry-code), 학급 버킷 테스트는 식별값을 바꿔 가며 20번에 막힌다(nickname-spacing).
+- 남은 위험: 네 자리 코드라는 구조 자체는 그대로다 — 하루 80회 상한이면 공격자가 한 반에서 하루 한 자리를 맞힐 확률이 약 20%(25자리 기준)로 남는다. 여러 IP를 쓰면 더 높다. 자리 수를 늘리는 것은 제품 결정이 필요하다. main 병합·운영 배포는 사용자 지시 후.
 
 ## 2026-10-31 그림책 만들기 개편 — book_creator TODO 9개 반영 (검증·PR #36 제출 완료)
 

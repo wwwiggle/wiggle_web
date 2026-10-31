@@ -440,6 +440,9 @@ export async function POST(request: Request) {
    * 그래서 이 학급에서 걸린 잠금을 한꺼번에 푼다. 3분을 기다리게 두면 아이가 수업에서 빠진다. */
   if (action === "clearEntryLocks") {
     const result = await db.prepare(`DELETE FROM entry_lockouts WHERE classroom_id = ?`).bind(classroomId).run();
+    // 이 반 참여 코드의 틀린 시도 상한(학급+IP 단위)도 함께 비운다. 접두어 비교라 다른 반 계수는 남는다.
+    const failurePrefix = `entry-fail:seatCode:${classroomId}:`;
+    await db.prepare(`DELETE FROM rate_limits WHERE substr(key, 1, ?) = ?`).bind(failurePrefix.length, failurePrefix).run();
     return noStoreJson({ cleared: result.meta.changes ?? 0 });
   }
 

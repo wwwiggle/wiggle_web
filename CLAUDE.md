@@ -19,7 +19,7 @@
 
 - 작업 저장소는 **`wwwiggle/wiggle_web`** 하나다(2026-10-31 사용자 지시: "깃허브 저장소를 옮겨서 … 여기서 작업 새로 할거거든"). 로컬 클론 경로는 기기마다 다르다.
   - `yonghwan86/wiggle_web`을 GitHub에서 **이전(transfer)**한 같은 저장소다(저장소 ID 동일, 옛 주소는 새 주소로 연결된다). 이슈·PR 번호와 Vercel 연결이 그대로 이어진다.
-  - `origin` = `https://github.com/wwwiggle/wiggle_web.git`. 작업 계정에 admin 권한이 있으므로 기능 브랜치를 `origin`에 바로 push하고 `gh pr create --repo wwwiggle/wiggle_web --base main`으로 PR을 연다. 포크를 거치지 않는다.
+  - `origin` = `https://github.com/wwwiggle/wiggle_web.git`. 조직이 2단계 인증(인증 앱·GitHub Mobile·보안 키·패스키, SMS 불가)을 요구해 그 전에는 push·API가 403이다. 작업 계정에 admin 권한이 있으므로 기능 브랜치를 `origin`에 바로 push하고 `gh pr create --repo wwwiggle/wiggle_web --base main`으로 PR을 연다. 포크를 거치지 않는다.
   - 옛 클론의 `origin`이 `yonghwan86/wiggle_web`이면 `git remote set-url origin https://github.com/wwwiggle/wiggle_web.git`으로 바꾼다.
   - 은퇴(2026-10-31): `wwwiggle/new_wiggle`(보관 처리됨)과의 양쪽 동기화 규칙(2026-09-21 결정), 포크(`wpdbs1229`·`qudcks1940`) 경유 PR.
 - `C:\Users\user\Desktop\Project\wiggle_draw`는 읽기 전용 참고 자료다. 수정하거나 통째로 복사하지 않는다.
@@ -69,7 +69,7 @@ git diff --check main...HEAD
 
 ## 배포 (GitHub → Vercel)
 
-- ⚠️ **운영은 `origin`(`wwwiggle/wiggle_web`)의 `main`을 빌드한다.** 2026-10-31 저장소 이전 뒤에도 같은 저장소의 GitHub 배포 기록에 Vercel Production 배포가 이어진다(`5ba702c`).
+- ⚠️ **운영은 `origin`(`wwwiggle/wiggle_web`)의 `main`을 빌드한다.** 2026-10-31 저장소 이전 직후 GitHub 푸시 알림이 Vercel에 닿지 않아 `5ba702c` 뒤의 main 커밋이 하나도 배포되지 않았다(Vercel 설정에는 연결된 것으로 보였다). 같은 날 Vercel CLI로 Git 연결을 끊었다가 다시 연결하고 `70cccea`를 직접 운영 배포했다. main에 새 커밋이 들어왔는데 몇 분 안에 GitHub 커밋 상태에 `Vercel`이 안 붙으면 이 일을 의심한다.
 - 운영 주소: **`https://www.kkumtle.app`** — Vercel 프로젝트 `wiggle-web`(서울 리전 icn1). 옛 `wiggleweb.vercel.app`은 같은 프로젝트의 서브도메인이고, `wiggle-web.vercel.app`은 타인 소유이므로 사용·안내 금지.
 - 운영 환경 변수는 Vercel 대시보드에서만 관리한다(9종: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `R2_S3_ENDPOINT`, `R2_S3_BUCKET`, `R2_S3_ACCESS_KEY_ID`, `R2_S3_SECRET_ACCESS_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPENAI_API_KEY`). 값에 따옴표를 넣지 않는다.
 - DB(Turso)는 첫 요청의 `ensureSchema()`가 자가 프로비저닝한다. **2026-10-31부터 Supabase로 이사 중**: `DATABASE_URL`이 있으면 Supabase Postgres(`web` 스키마, `db/postgres-schema.ts`), 없으면 Turso. SQLite 스키마에 칸·표를 더하면 `db/postgres-schema.ts`에도 더한다(`tests/postgres-schema.test.mjs`가 확인). 운영 Turso·R2 데이터를 SQL·S3로 직접 수정·삭제하지 않는다(정리도 사용자 승인 필요).
