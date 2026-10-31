@@ -31,5 +31,16 @@ export function createDatabase(
   if ((environment === "preview" || environment === "production") && LOCAL_HOSTS.has(host)) {
     throw new Error(`${environment} 환경에서는 로컬 DATABASE_URL을 사용할 수 없어요.`);
   }
-  return createPostgresD1(url);
+  return createPostgresD1(url, { requestScope: workersRequestScope() });
+}
+
+/** Cloudflare Workers에서만: 지금 요청의 문맥 객체(OpenNext가 넘겨 주는 ExecutionContext). 그 밖에서는 undefined. */
+function workersRequestScope(): (() => object) | undefined {
+  if (typeof navigator === "undefined" || navigator.userAgent !== "Cloudflare-Workers") return undefined;
+  const context = Symbol.for("__cloudflare-context__");
+  return () => {
+    const current = (globalThis as Record<symbol, { ctx?: object } | undefined>)[context];
+    if (!current?.ctx) throw new Error("Cloudflare 요청 문맥을 찾지 못했어요.");
+    return current.ctx;
+  };
 }

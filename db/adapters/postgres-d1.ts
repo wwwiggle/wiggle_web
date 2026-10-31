@@ -147,10 +147,15 @@ export class PostgresPreparedStatement {
 }
 
 export class PostgresD1 {
-  readonly sql: Sql;
+  private readonly client: Sql | (() => Sql);
 
-  constructor(sql: Sql) {
-    this.sql = sql;
+  /** 고정 클라이언트(Vercel·로컬·테스트) 또는 요청마다 클라이언트를 돌려주는 함수(Cloudflare Workers). */
+  constructor(client: Sql | (() => Sql)) {
+    this.client = client;
+  }
+
+  get sql(): Sql {
+    return typeof this.client === "function" && !("unsafe" in this.client) ? (this.client as () => Sql)() : (this.client as Sql);
   }
 
   prepare(sql: string): PostgresPreparedStatement {
@@ -197,6 +202,22 @@ export function createPostgresClient(url: string, options: { max?: number } = {}
   });
 }
 
-export function createPostgresD1(url: string, options?: { max?: number }): PostgresD1 {
-  return new PostgresD1(createPostgresClient(url, options));
+/**
+ * Cloudflare Workers에서는 한 요청이 연 연결(소켓)을 다른 요청이 쓸 수 없다("Cannot perform I/O on behalf of a different request").
+ * 그래서 Workers에서는 요청마다 연결을 하나 만들고(요청 문맥을 키로) 그 요청 안에서만 쓴다. 요청이 끝나면 Workers가 소켓을 닫는다.
+ * Vercel·로컬·테스트(Node)는 지금처럼 연결 하나를 돌려 쓴다.
+ */
+export function createPostgresD1(url: string, options?: { max?: number; requestScope?: () => object }): PostgresD1 {
+  if (!options?.requestScope) return new PostgresD1(createPostgresClient(url, options));
+  const scope = options.requestScope;
+  const clients = new WeakMap<object, Sql>();
+  return new PostgresD1(() => {
+    const key = scope();
+    let client = clients.get(key);
+    if (!client) {
+      client = createPostgresClient(url, { max: 1 });
+      clients.set(key, client);
+    }
+    return client;
+  });
 }

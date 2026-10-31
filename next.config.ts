@@ -42,7 +42,9 @@ const nextConfig: NextConfig = {
   // 저장소의 제품·보안 규칙 AGENTS.md를 Next가 실행 때마다 자동 수정하지 않게 한다.
   agentRules: false,
   // libSQL 클라이언트는 네이티브 바인딩을 포함하므로 서버 번들에 넣지 않는다.
-  serverExternalPackages: cloudflare ? [] : ["@libsql/client", "libsql", "@resvg/resvg-js", "sharp"],
+  // Cloudflare: postgres는 Next가 묶지 않게 두어, OpenNext가 Workers용 빌드(workerd 조건 → cloudflare:sockets)를 고르게 한다.
+  // Next가 묶으면 Node용(net 모듈)이 들어가 DB 요청이 멈춘다.
+  serverExternalPackages: cloudflare ? ["postgres"] : ["@libsql/client", "libsql", "@resvg/resvg-js", "sharp"],
   ...(cloudflare
     ? {
         webpack(config: { plugins: unknown[] }, { webpack }: { webpack: { NormalModuleReplacementPlugin: new (pattern: RegExp, replacement: string) => unknown } }) {

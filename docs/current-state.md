@@ -7,7 +7,11 @@
 - `lib/security.ts` `requireTeacher`: 쿠키를 먼저 읽고 DB 준비를 한다. 전에는 DB 준비가 먼저라 빌드 때 `/admin` 같은 페이지를 미리 그리며 **빌드 환경에서 운영 DB에 접속**했다(Cloudflare 빌드는 DB가 없어 여기서 멈췄다). 동작은 같다.
 - `wrangler.jsonc`(Worker `wiggle-web`), `open-next.config.ts`, `@cloudflare/workers-types` 5로 올림(wrangler 요구). `.open-next`·`.wrangler`는 lint·git·tsconfig에서 뺐다.
 - 진행표 `docs/cloudflare-cutover.md`: 필요한 것(유료 요금제·Vercel 비밀 값·배포 권한), 순서, 되돌리기(DNS), 이사 전 DNS 기록.
-- 검증: Cloudflare 빌드 성공, Vercel 빌드 성공, typecheck, lint 오류 0(경고 14), Turso 464/464, Postgres 456/456. 실제 Worker 실행은 아직(비밀 값·요금제 필요).
+- **Workers에서 DB가 멈추던 두 가지**(로컬 workerd `opennextjs-cloudflare preview`로 재현·수정):
+  - Next가 postgres를 묶으면 Node용(net 모듈)이 들어가 DB 요청이 멈춘다 → Cloudflare 빌드에서 `postgres`를 바깥 모듈로 두어 OpenNext가 Workers용(`cloudflare:sockets`)을 고르게 했다.
+  - 한 요청이 연 연결을 다른 요청이 쓰면 "Cannot perform I/O on behalf of a different request" → Workers에서는 요청 문맥(OpenNext AsyncLocalStorage의 ctx)마다 연결을 따로 만든다(`createPostgresD1`의 `requestScope`, `db/adapters/database.ts`). Node(Vercel·테스트)는 그대로 연결 하나를 돌려 쓴다.
+- 로컬 workerd + 로컬 Postgres로 확인: `/`·`/student` 200, `/api/health` 200, 없는 수업 코드 404(순서대로·동시 8개 모두), 학생 입장 확인 200 → 입장 201 → 학생 홈 200 → 그림책 만들기 201. 그림 만들기는 유료 잠금(PR #41)으로 403 — 정상.
+- 검증: Cloudflare 빌드 성공, Vercel 빌드 성공, typecheck, lint 오류 0(경고 14), Turso 464/464, Postgres 456/456. 실제 Cloudflare 배포는 아직(비밀 값·요금제 필요).
 
 ## 2026-11-01 그리기 서버 자동 빌드·배포 (`claude/render-deploy`)
 
