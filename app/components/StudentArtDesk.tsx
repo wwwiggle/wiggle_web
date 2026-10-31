@@ -33,8 +33,8 @@ const DRAWING = (artwork: DeskArtwork) => artwork.status !== "complete";
 /** 카드 한 장이 통째로 링크다. 안에 또 링크나 단추를 넣지 않는다(인계 지시 — 중첩 금지). */
 function ArtworkCard({ artwork }: { artwork: DeskArtwork }) {
   const drawing = DRAWING(artwork);
-  // 그리다 만 그림은 그림판으로 이어지므로, 그림 그리기가 잠기면(유료 요금제) 카드를 누를 수 없게 둔다.
-  const locked = drawing && DRAWING_LOCKED;
+  // 그림 그리기가 잠기면(유료 요금제) 「내 그림」 칸 전체를 잠근다 — 그리는 중·완성 그림 모두(2026-11-01 사용자 지시).
+  const locked = DRAWING_LOCKED;
   const Card = locked ? "span" : "a";
   return <Card className={`desk-art-card${locked ? " paid-lock" : ""}`} {...(locked ? { "aria-disabled": true, title: DRAWING_LOCKED_MESSAGE } : { href: drawing ? `/student/draw/${encodeURIComponent(artwork.id)}` : `/student/archive/${encodeURIComponent(artwork.id)}` })}>
     <span className="desk-art-paper">
@@ -136,7 +136,7 @@ export function StudentArtDesk({ nickname, artworks, artworkTotal }: { nickname:
         <section className="desk-section" aria-labelledby="desk-art-title">
           <div className="desk-section-head">
             <h2 id="desk-art-title"><img src="/student-desk/icon-my-art.svg" alt="" aria-hidden="true" width={28} height={28} />내 그림</h2>
-            {artworkTotal > shown.length && <a className="desk-more" href="/student/archive">내 그림 모두 보기 ({artworkTotal}장)</a>}
+            {artworkTotal > shown.length && (DRAWING_LOCKED ? <PaidLock className="desk-more" badge={false}>🔒 내 그림 모두 보기 ({artworkTotal}장)</PaidLock> : <a className="desk-more" href="/student/archive">내 그림 모두 보기 ({artworkTotal}장)</a>)}
           </div>
           <ul className="desk-art-row">
             {/* 모든 화면 크기에서 새 그림이 시각·탭 순서의 맨 앞이다. */}
