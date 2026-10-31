@@ -1,5 +1,21 @@
 # Wiggle Web 현재 상태
 
+## 2026-10-31 저장소 이전 — `wwwiggle/wiggle_web` 단일 저장소
+
+- 사용자 지시: "이제 깃허브 저장소를 옮겨서 https://github.com/wwwiggle/wiggle_web.git 여기야. 여기서 작업 새로 할거거든? 환경을 조금씩 다 바꿨어."
+- 저장소 이전 확인 결과
+  - `yonghwan86/wiggle_web`과 `wwwiggle/wiggle_web`의 저장소 ID가 1308176523으로 같다. 복사가 아니라 GitHub 이전이다.
+  - 이전 직후 `main`은 `5ba702c`이고, PR #33·#35·#36(그림책 만들기 개편)이 병합된 상태다.
+  - Vercel Production 배포 기록이 같은 저장소에 이어진다.
+  - `wwwiggle/new_wiggle`은 보관(archived) 처리됐다.
+- 규칙 변경
+  - `CLAUDE.md` 「프로젝트 경계」·「배포」를 단일 저장소 기준으로 고쳤다. 기능 브랜치는 `origin`에 바로 push하고 PR을 연다.
+  - 양쪽 동기화 규칙과 포크 경유 PR은 은퇴시켰다.
+- 앞으로 할 일
+  - 저장소 안의 환경·DB 코드(`.env.example`, `db/`, `lib/runtime/`)는 이전으로 바뀐 것이 없다.
+  - 사용자가 말한 환경 변경은 Vercel·Turso·R2 같은 외부 설정 쪽으로 보이며, 무엇이 바뀌었는지는 아직 확인하지 않았다.
+  - 운영 자격증명을 쓰는 작업 전에는 사용자에게 무엇이 바뀌었는지 확인한다.
+
 ## 2026-10-31 그림책 만들기 개편 — book_creator TODO 9개 반영 (검증·PR #36 제출 완료)
 
 - 출처: 사용자의 `qudcks1940/book_creator` `TODO.md`·`docs/cover-and-ebook.md`·`docs/privacy-school-info.md`. 결정·선택 원문은 `product-decisions.md` 「2026-10-31 그림책 만들기 개편」, 업체·법률 확인 항목은 `pending-decisions.md`.

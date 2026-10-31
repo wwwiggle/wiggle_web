@@ -17,14 +17,12 @@
 
 ## 프로젝트 경계
 
-- 작업 저장소는 `C:\Users\user\Desktop\Project\wiggle_web`이다.
+- 작업 저장소는 **`wwwiggle/wiggle_web`** 하나다(2026-10-31 사용자 지시: "깃허브 저장소를 옮겨서 … 여기서 작업 새로 할거거든"). 로컬 클론 경로는 기기마다 다르다.
+  - `yonghwan86/wiggle_web`을 GitHub에서 **이전(transfer)**한 같은 저장소다(저장소 ID 동일, 옛 주소는 새 주소로 연결된다). 이슈·PR 번호와 Vercel 연결이 그대로 이어진다.
+  - `origin` = `https://github.com/wwwiggle/wiggle_web.git`. 작업 계정에 admin 권한이 있으므로 기능 브랜치를 `origin`에 바로 push하고 `gh pr create --repo wwwiggle/wiggle_web --base main`으로 PR을 연다. 포크를 거치지 않는다.
+  - 옛 클론의 `origin`이 `yonghwan86/wiggle_web`이면 `git remote set-url origin https://github.com/wwwiggle/wiggle_web.git`으로 바꾼다.
+  - 은퇴(2026-10-31): `wwwiggle/new_wiggle`(보관 처리됨)과의 양쪽 동기화 규칙(2026-09-21 결정), 포크(`wpdbs1229`·`qudcks1940`) 경유 PR.
 - `C:\Users\user\Desktop\Project\wiggle_draw`는 읽기 전용 참고 자료다. 수정하거나 통째로 복사하지 않는다.
-- `wiggle_web`은 **저장소 두 곳을 함께 최신으로 유지한다**(2026-09-21 사용자 확정: "지금 둘다 진행중이야 둘 다 최신상태 유지해야햐").
-  - `origin` = `yonghwan86/wiggle_web` — **운영 배포처**(`https://www.kkumtle.app`). 이 맥의 GitHub 계정은 읽기 권한만 있어 직접 push가 403이다.
-    반영은 `fork`(= `wpdbs1229/wiggle_web`)에 브랜치를 push한 뒤 `gh pr create --repo yonghwan86/wiggle_web --base main --head wpdbs1229:<브랜치>` → 사용자가 머지한다.
-  - `wwwiggle` = `wwwiggle/new_wiggle` — 사용자 admin 권한이라 `git push wwwiggle <브랜치>:main`으로 바로 올린다.
-  - 한쪽에만 올리고 끝내지 않는다. 다른 쪽 `main` 기준 브랜치에 cherry-pick 해 양쪽에 반영하고, 옮긴 쪽에서도 검증을 다시 돌린다.
-    (2026-09-21: 한쪽에만 올린 뒤 "배포가 안 된다"고 오진한 사고. 두 main은 9월 15일에 갈라졌다가 9월 22일 다시 합쳐졌다.)
 - `.openai/hosting.json`은 은퇴한 Sites 연결의 이력이다. 삭제하거나 프로젝트 ID를 바꾸지 않는다.
 - `.env.local`, API 키, 토큰, 쿠키 등 비밀값을 읽어 출력하거나 커밋하지 않는다.
 - 운영 자격증명(TURSO_*, R2_S3_*)은 `.env.local`에 `# vercel-only: KEY=value` 주석으로만 보관한다. 활성 줄로 두면 Next dev가 env를 핫리로드해 로컬 개발·테스트가 운영 DB·버킷에 그대로 쓴다(2026-08-19 실제 사고). 원격 검증이 필요할 때만 잠깐 활성화하고 즉시 되돌린다.
@@ -70,7 +68,7 @@ git diff --check main...HEAD
 
 ## 배포 (GitHub → Vercel)
 
-- ⚠️ **운영은 `origin`(`yonghwan86/wiggle_web`)의 `main`을 빌드한다.** `wwwiggle/new_wiggle`에만 올린 것은 운영에 나가지 않는다 — 2026-09-23 실측으로 확인(운영 CSS 지문이 origin 쪽과 일치). 2026-09-12에 "운영이 멈춰 있다"고 적었던 것은 해소됐다.
+- ⚠️ **운영은 `origin`(`wwwiggle/wiggle_web`)의 `main`을 빌드한다.** 2026-10-31 저장소 이전 뒤에도 같은 저장소의 GitHub 배포 기록에 Vercel Production 배포가 이어진다(`5ba702c`).
 - 운영 주소: **`https://www.kkumtle.app`** — Vercel 프로젝트 `wiggle-web`(서울 리전 icn1). 옛 `wiggleweb.vercel.app`은 같은 프로젝트의 서브도메인이고, `wiggle-web.vercel.app`은 타인 소유이므로 사용·안내 금지.
 - 운영 환경 변수는 Vercel 대시보드에서만 관리한다(9종: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `R2_S3_ENDPOINT`, `R2_S3_BUCKET`, `R2_S3_ACCESS_KEY_ID`, `R2_S3_SECRET_ACCESS_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPENAI_API_KEY`). 값에 따옴표를 넣지 않는다.
 - DB(Turso)는 첫 요청의 `ensureSchema()`가 자가 프로비저닝한다. 운영 Turso·R2 데이터를 SQL·S3로 직접 수정·삭제하지 않는다(정리도 사용자 승인 필요).
