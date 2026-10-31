@@ -1,5 +1,20 @@
 # Wiggle Web 현재 상태
 
+## 2026-11-01 `preview/supabase` 미리보기 준비 (Vercel 설정, 비밀값 제외)
+
+- 사용자가 받은 팀 안내문(GitHub 웹으로 main 배포 → `preview/supabase` 브랜치 → Preview에 `DATABASE_URL`)을 오늘 상태와 대조했다. main 배포 단계는 Git 재연결로 필요 없어졌고("용환님 이름 커밋이라야 배포" 설명은 틀린 진단), 미리보기 단계는 그대로면 막힌다.
+- 사용자 지시("해 줘")로 비밀값이 아닌 부분만 했다.
+  - `preview/supabase` 브랜치를 main(`253f822`)에서 만들었다.
+  - Vercel 브랜치 전용 Preview 변수(`preview/supabase`): `WIGGLE_DATA_ENV=preview`, 그리고 `TURSO_DATABASE_URL=file:/blocked-preview-supabase-needs-DATABASE_URL.db`.
+    `WIGGLE_DATA_ENV`만 바꾸면 `DATABASE_URL`이 없을 때 안전장치를 통과한 미리보기가 운영 Turso를 쓰게 된다. Turso 주소를 일부러 못 쓰는 값으로 덮어, `DATABASE_URL`이 들어오기 전에는 빌드가 실패하게 했다.
+  - Ignored Build Step: `[ -n "$VERCEL_GIT_COMMIT_REF" ] && [ "$VERCEL_GIT_COMMIT_REF" != "main" ] && [ "$VERCEL_GIT_COMMIT_REF" != "preview/supabase" ]` — main·`preview/supabase`만 빌드한다.
+  - 확인: API로 만든 `preview/supabase` 미리보기가 "preview 환경에서는 file: 데이터베이스를 사용할 수 없어요"로 실패 → 브랜치 전용 값 두 개가 일반 Preview 값보다 우선함을 확인.
+- 남은 일
+  - **`DATABASE_URL`** 을 Preview·`preview/supabase` 브랜치에만 추가(비밀값, 사용자). 그 뒤 브랜치에 커밋하나를 올리거나 재배포하면 Supabase로 빌드된다.
+  - 미리보기 접속: 프로젝트의 Vercel 로그인 보호(`all_except_custom_domains`)가 켜져 있어 팀원은 미리보기 주소에서 막힌다(Hobby라 팀원 추가 불가). 보호를 끌지, 이 브랜치에 고정 도메인을 붙일지 사용자 결정. 교사 구글 로그인까지 쓰려면 그 주소를 구글 콘솔 리디렉션 URI에 등록한다.
+  - 그 Supabase에 운영 데이터를 옮겨 두면 미리보기에서 쓴 내용이 곧 운영이 될 DB에 들어간다 — 시험용인지 이사 리허설인지 팀이 정한다.
+  - 운영 Turso 읽기 전용 토큰을 팀원에게 줄 때는 만료 기한을 짧게 두고, 옮기기가 끝나면 폐기한다(학생 실명 명단 포함).
+
 ## 2026-11-01 Vercel 자동 배포 끊김 복구·운영 배포 (`70cccea`)
 
 - 증상: 저장소 이전 뒤 main에 들어온 #40·#41·#39·#42·#43 병합과 사용자의 문서 커밋(`70cccea`)이 하나도 배포되지 않았다. GitHub 커밋 상태·배포 기록에 Vercel 반응이 없었고 운영은 `5ba702c`(10-31 13:01 UTC 배포)에 머물렀다.
