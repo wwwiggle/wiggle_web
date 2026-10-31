@@ -114,7 +114,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   const db = bindings().DB; const versionId = id("version");
   const statements = [
     db.prepare(`UPDATE artworks SET ops_json = ?, current_step = ?, revision = ?, thumbnail_key = COALESCE(?, thumbnail_key), final_image_key = COALESCE(?, final_image_key), last_mutation_id = ?, status = CASE WHEN ? = 1 THEN 'complete' ELSE status END, completed_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE completed_at END, updated_at = CURRENT_TIMESTAMP, version_count = version_count + ? WHERE id = ? AND student_id = ? AND revision = ? AND status <> 'complete'`).bind(serialized, currentStep, newRevision, thumbnailKey, finalKey, requestId, complete ? 1 : 0, complete ? 1 : 0, complete ? 1 : 0, artworkId, student.id, expectedRevision),
-    db.prepare(`INSERT OR IGNORE INTO artwork_mutations(request_id, artwork_id, student_id, result_revision) SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM artworks WHERE id = ? AND student_id = ? AND revision = ? AND last_mutation_id = ?)`).bind(requestId, artworkId, student.id, newRevision, artworkId, student.id, newRevision, requestId),
+    db.prepare(`INSERT INTO artwork_mutations(request_id, artwork_id, student_id, result_revision) SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM artworks WHERE id = ? AND student_id = ? AND revision = ? AND last_mutation_id = ?) ON CONFLICT DO NOTHING`).bind(requestId, artworkId, student.id, newRevision, artworkId, student.id, newRevision, requestId),
   ];
   if (complete) {
     // sequence는 batch 안에서 갱신된 version_count로 계산한다. 요청 시작 시점에 읽은 값을 쓰면

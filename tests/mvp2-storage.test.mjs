@@ -6,7 +6,7 @@ import test from "node:test";
 import { FsArtworksStore } from "../db/adapters/artworks-store.ts";
 import { findOwnedCoachingEvent, recordCoachingAfter, recordCoachingBefore } from "../lib/coaching-store.ts";
 import { approveTeacherDraftMessage, validateTeacherMessageTarget } from "../lib/teacher-messages.ts";
-import { createTestDb } from "./harness/db.mjs";
+import { createTestDb, testPostgresUrl } from "./harness/db.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 const document = { schemaVersion: 1, rendererVersion: 1, size: 1024, ops: [] };
@@ -156,7 +156,8 @@ test("the draft fixture enforces the production approved_message_id foreign key"
   const { handle, DB } = await fixture();
   try {
     // 이 테이블에 FK가 없으면 승인 배치의 문장 순서가 뒤집혀도 테스트가 통과해 버린다.
-    assert.equal((await DB.prepare("PRAGMA foreign_keys").first()).foreign_keys, 1);
+    // SQLite는 연결마다 FK 검사를 켜야 한다. Postgres는 늘 켜져 있다.
+    if (!testPostgresUrl) assert.equal((await DB.prepare("PRAGMA foreign_keys").first()).foreign_keys, 1);
     await assert.rejects(
       DB.prepare("UPDATE teacher_coaching_drafts SET approved_message_id = 'message_missing' WHERE id = 'draft_a'").run(),
       /FOREIGN KEY/i,

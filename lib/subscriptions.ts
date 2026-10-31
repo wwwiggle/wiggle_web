@@ -47,7 +47,7 @@ export async function verifyAndApplySubscriptionWebhook(DB: D1Database, provider
   const occurredAt = new Date(event.occurredAt).toISOString();
   const payloadHash = await sha256(payload);
   const results = await DB.batch([
-    DB.prepare(`INSERT OR IGNORE INTO subscription_webhook_events(provider, event_id, payload_hash, occurred_at, signature_verified) VALUES (?, ?, ?, ?, 1)`)
+    DB.prepare(`INSERT INTO subscription_webhook_events(provider, event_id, payload_hash, occurred_at, signature_verified) VALUES (?, ?, ?, ?, 1) ON CONFLICT DO NOTHING`)
       .bind(provider.id, event.id, payloadHash, occurredAt),
     DB.prepare(`INSERT INTO subscription_entitlements(teacher_id, plan_code, status, provider, external_customer_ref, external_subscription_ref, current_period_end, provider_event_at, provider_event_id, updated_at)
       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP

@@ -1,5 +1,17 @@
 # Wiggle Web 현재 상태
 
+## 2026-10-31 DB Turso → Supabase 이사 1단계: 두 DB 모두 도는 코드 (`claude/supabase-db`, 로컬 검증)
+
+- **방식.** `DATABASE_URL`(Postgres)이 있으면 Supabase, 없으면 지금처럼 Turso(`db/adapters/database.ts`). 운영 전환 = Vercel에 `DATABASE_URL` 넣기, 되돌리기 = 지우기. 이사가 끝나면 Turso 길을 걷어 낸다.
+- **어댑터** `db/adapters/postgres-d1.ts`(postgres.js 3.4.9, 연결 풀러용 `prepare: false`). 호출부 281곳의 D1 API·SQLite SQL을 그대로 두고, 퍼져 있는 차이만 한곳에서 바꾼다: `?`→`$n`, `CURRENT_TIMESTAMP`→`sqlite_now()`(같은 'YYYY-MM-DD HH:MM:SS' 텍스트), camelCase 별칭 따옴표, `CHAR(n)`→`chr(n)`, `datetime(x)`·`datetime('now','-N minutes')`, `json_array_length/json_extract(x,'$.k')`, `x IS NOT 2`, `? IS NULL` 타입, 결과 true/false→1/0·bigint→number, batch=트랜잭션, meta.changes=영향 행 수. 오류에는 깨진 SQL(값 없이)을 붙인다.
+- **호출부 수정(두 DB 공통 문법).** `INSERT OR IGNORE` 9곳 → `INSERT … ON CONFLICT DO NOTHING`. `strftime(…,'now')` 3곳 → JS `new Date().toISOString()` 바인딩. `COLLATE NOCASE` → `lower()`. Postgres가 거부하는 `GROUP BY` 2곳(관리자 학급 목록, 교사 메시지)에 칸을 더했다.
+- **스키마** `db/postgres-schema.ts`: SQLite 최종 스키마(테이블 43개, 인덱스 포함)를 옮겼다. INTEGER→BIGINT, 시각 칸은 TEXT 유지. `provisionSchema`가 Postgres면 이것을 세우고 SQLite 업그레이드 분기(PRAGMA·ALTER)는 타지 않는다. `tests/postgres-schema.test.mjs`가 두 스키마의 표·칸 구성이 같은지 지킨다 — **SQLite에 칸을 더하면 여기에도 더해야 한다.**
+- **테스트.** `npm run test:postgres` = 내장 Postgres 17(`embedded-postgres`, Docker 불필요, 윈도·맥 공통)을 띄워 전체 테스트를 Postgres로 돌린다. 테스트 DB마다 데이터베이스를 새로 만든다. SQLite 전용 테스트 2개 파일(`turso-adapters`, `legacy-migration`)과 MVP3 옛 스키마 업그레이드 1건은 건너뛴다. 실패 원인 볼 때 `WIGGLE_TEST_SERVER_LOG=<폴더>`로 서버 기록을 남긴다. 테스트 준비 코드의 SQLite 전용 문법(트리거·`datetime`·`strftime`·`INSERT OR IGNORE`·`PRAGMA`)은 두 DB에서 돌게 고쳤다.
+- **이사 스크립트** `scripts/migrate-turso-to-postgres.mjs`: Turso는 SELECT만, 부모→자식 순서로 옮기고 표마다 행 수·내용 해시를 비교한다. 대상에 행이 있으면 멈춘다(리허설 재실행만 `--truncate-target`). 값은 출력하지 않는다.
+- 검증(Node 25.5.0 — `.nvmrc` 22.23.2가 이 맥에 없음): typecheck 통과, lint 오류 0(기존 경고 14), production build. **Turso 전체 445/445**, **Postgres 전체 435/435 + 건너뜀 1**. 이사 스크립트를 로컬 개발 DB 사본(43표, 260행)으로 리허설 → 내장 Postgres로 옮겨 43표 모두 행 수·해시 일치, 비어 있지 않은 대상에서 멈춤 확인.
+- 남은 일: ① Supabase 개발 프로젝트에 `web` 스키마·전용 DB 역할(search_path=web) 만들기 ② 운영 Turso 자격증명(Vercel에만 있음)으로 개발 Supabase에 리허설 ③ Vercel Preview에서 `DATABASE_URL`로 실제 화면 확인 ④ 수업 없는 시간에 운영 이사·전환 ⑤ 며칠 뒤 Turso 길 제거. 운영 데이터·Vercel 설정은 아직 건드리지 않았다.
+- 남은 위험: 실제 브라우저 확인은 하지 않았다(테스트는 실제 HTTP 서버로 돌았다). 연결 풀러(Supavisor)에서의 동작·지연은 ②③에서 처음 확인된다. SQLite와 Postgres는 NULL 정렬 순서가 다르다(ASC에서 SQLite는 앞, Postgres는 뒤) — 테스트에서 드러난 곳은 없었다.
+
 ## 2026-10-31 그림책 만들기 개편 — book_creator TODO 9개 반영 (검증·PR #36 제출 완료)
 
 - 출처: 사용자의 `qudcks1940/book_creator` `TODO.md`·`docs/cover-and-ebook.md`·`docs/privacy-school-info.md`. 결정·선택 원문은 `product-decisions.md` 「2026-10-31 그림책 만들기 개편」, 업체·법률 확인 항목은 `pending-decisions.md`.

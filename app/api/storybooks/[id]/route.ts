@@ -50,7 +50,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   const db = bindings().DB;
   const results = await db.batch([
     db.prepare(`UPDATE storybooks SET title = ?, document_json = ?, revision = ?, status = CASE WHEN ? = 1 THEN 'complete' ELSE 'draft' END, completed_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, last_mutation_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND student_id = ? AND revision = ?`).bind(title, JSON.stringify(document), newRevision, complete ? 1 : 0, complete ? 1 : 0, requestId, storybookId, student.id, expectedRevision),
-    db.prepare(`INSERT OR IGNORE INTO storybook_mutations(request_id, storybook_id, student_id, result_revision) SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM storybooks WHERE id = ? AND student_id = ? AND revision = ? AND last_mutation_id = ?)`).bind(requestId, storybookId, student.id, newRevision, storybookId, student.id, newRevision, requestId),
+    db.prepare(`INSERT INTO storybook_mutations(request_id, storybook_id, student_id, result_revision) SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM storybooks WHERE id = ? AND student_id = ? AND revision = ? AND last_mutation_id = ?) ON CONFLICT DO NOTHING`).bind(requestId, storybookId, student.id, newRevision, storybookId, student.id, newRevision, requestId),
   ]);
   if (!results[0]?.meta.changes) {
     const duplicate = await priorStorybookMutation(requestId, storybookId, student.id);

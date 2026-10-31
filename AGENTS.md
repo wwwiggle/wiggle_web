@@ -35,13 +35,13 @@ git diff --check
 git diff --check main...HEAD
 ```
 
-- `npm.cmd test`는 production build 뒤 전체 테스트(268개)를 실행한다. 무거운 HTTP 통합만 따로 돌리려면 `npm.cmd run test:integration`.
+- `npm.cmd test`는 production build 뒤 전체 테스트를 실행한다. DB 이사 기간(2026-10-31~)에는 `npm.cmd run test:postgres`로 같은 테스트를 Postgres로도 돌린다. 무거운 HTTP 통합만 따로 돌리려면 `npm.cmd run test:integration`.
 - 브라우저 실측: 로컬 서버를 띄운 뒤 `npm.cmd run check:browser` — `320×568`, `390×844`, `844×390`에서 computed size·잘림·초점·연속 탭을 실제 DOM으로 확인한다.
 - 테스트가 문자열 존재만 확인하면서 실제 UX를 통과했다고 주장하지 않는다.
 - 저장·이미지·인증 경로를 바꿨다면 배포 후 운영 실측(`scripts/check-deployed.mjs`)까지가 검증이다 — 실제 수업 코드가 필요하므로 사용자와 조율한다.
 
 ## 배포 요약
 
-- 운영: `https://wiggleweb.vercel.app` (Vercel 프로젝트 `wiggle-web`, `main` push 시 자동 배포).
+- 운영: `https://www.kkumtle.app` (저장소 `wwwiggle/wiggle_web`, Vercel 프로젝트 `wiggle-web`, `main` 반영 시 자동 배포). DB는 Turso → Supabase 이사 중이다(`DATABASE_URL`).
 - 운영 환경 변수는 Vercel 대시보드에서 관리한다. 저장소에는 어떤 비밀값도 두지 않는다.
 - 교사 인증은 구글 OAuth — 새 도메인은 구글 콘솔 리디렉션 URI 추가가 필요하다.

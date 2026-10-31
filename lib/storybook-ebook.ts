@@ -23,7 +23,7 @@ const toLink = (row: LinkRow): EbookLink => ({ token: row.token, shared: row.sha
 export async function ebookLink(storybookId: string): Promise<EbookLink> {
   await ensureSchema();
   const db = bindings().DB;
-  await db.prepare(`INSERT OR IGNORE INTO storybook_ebook_links(storybook_id, token) VALUES (?, ?)`).bind(storybookId, newToken()).run();
+  await db.prepare(`INSERT INTO storybook_ebook_links(storybook_id, token) VALUES (?, ?) ON CONFLICT DO NOTHING`).bind(storybookId, newToken()).run();
   const row = await db.prepare(`SELECT token, shared, shared_at AS sharedAt, consent_method AS consentMethod FROM storybook_ebook_links WHERE storybook_id = ?`).bind(storybookId).first<LinkRow>();
   if (!row) throw new Error("ebook 링크를 만들지 못했어요.");
   return toLink(row);

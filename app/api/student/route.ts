@@ -99,7 +99,7 @@ async function studentPost(request: Request) {
     const db = bindings().DB;
     const accessible = await db.prepare(`SELECT 1 FROM teacher_messages WHERE id = ? AND classroom_id = ? AND (student_id IS NULL OR student_id = ?) LIMIT 1`).bind(messageId, student.classroomId, student.id).first();
     if (!accessible) return jsonError("확인할 선생님 말씀을 찾지 못했어요.", 404);
-    await db.prepare(`INSERT OR IGNORE INTO message_receipts(message_id, student_id, seen_at) VALUES (?, ?, CURRENT_TIMESTAMP)`).bind(messageId, student.id).run();
+    await db.prepare(`INSERT INTO message_receipts(message_id, student_id, seen_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING`).bind(messageId, student.id).run();
     return noStoreJson({ ok: true });
   }
 
@@ -140,9 +140,9 @@ async function studentPost(request: Request) {
       .all<{ id: string }>();
     if (accessible.results.length !== messageIds.length) return jsonError("확인할 선생님 말씀을 찾지 못했어요.", 404);
 
-    await db.batch(messageIds.map((messageId) => db.prepare(`INSERT OR IGNORE INTO message_receipts(message_id, student_id, seen_at)
+    await db.batch(messageIds.map((messageId) => db.prepare(`INSERT INTO message_receipts(message_id, student_id, seen_at)
       SELECT ?, ?, CURRENT_TIMESTAMP
-      WHERE EXISTS (SELECT 1 FROM teacher_messages WHERE id = ? AND classroom_id = ? AND (student_id IS NULL OR student_id = ?))`)
+      WHERE EXISTS (SELECT 1 FROM teacher_messages WHERE id = ? AND classroom_id = ? AND (student_id IS NULL OR student_id = ?)) ON CONFLICT DO NOTHING`)
       .bind(messageId, student.id, messageId, student.classroomId, student.id)));
     return noStoreJson({ ok: true, acknowledged: messageIds.length });
   }

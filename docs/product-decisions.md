@@ -1,6 +1,13 @@
 # Wiggle Web 확정 제품 결정
 
 
+## 2026-10-31 저장소 하나로 모으기 · DB를 Supabase로 이사
+
+- 사용자: "용환에서 작업하던사람2명 우리웹에서 작업하던 사람 2명이야. 이제는 웹에서 4명이 같이 동일한곳에서 작업하려고 하는게 내 목표야." 운영 저장소 `yonghwan86/wiggle_web`을 **`wwwiggle/wiggle_web`으로 이전**했다(용환님 실행). `wwwiggle/new_wiggle`은 보관(읽기 전용)했다 — 그쪽 작업 8개는 PR #33으로 이미 운영에 들어갔다. 네 명 모두 이 저장소에서 바로 `claude/*`·`codex/*` 기능 브랜치 → PR로 작업한다. 포크·두 저장소 동시 유지 규칙은 없어졌다.
+- 사용자: "supabase랑 cloud로 거기도 변경해야한다." 꿈틀 그림책과 같이 **Cloudflare + Supabase**로 옮긴다. 한 번에 하나씩: ① DB Turso → Supabase(서버는 Vercel 그대로) ② `sharp`·`resvg`를 쓰는 그림책 PDF 만들기 해결(Cloudflare Workers에서 안 돈다) ③ Vercel → Cloudflare Workers ④ (선택) 로그인. Vercel은 비용 때문에 ③에서 없앤다.
+- DB는 새 프로젝트를 만들지 않고 꿈틀 그림책의 Supabase 프로젝트(개발 `kkumtle-book-dev`, 운영 `kkumtle-book`) 안 **`web` 스키마**에 둔다. 그림책 표(public)와 섞이지 않고, 나중에 선생님 계정을 하나로 합치기 쉽다.
+- 전환은 Vercel 환경 변수 `DATABASE_URL`로 한다. 값이 있으면 Postgres, 없으면 Turso다. 되돌리기는 변수를 지우는 것으로 끝난다. 이사 기간에 DB 구조를 바꾸는 작업은 이사 담당에게 미리 알린다(`db/postgres-schema.ts`에도 같은 칸을 더해야 한다).
+
 ## 2026-10-31 그림책 만들기 개편 (book_creator TODO 반영)
 
 출처: 사용자가 정리한 `qudcks1940/book_creator`의 `TODO.md`, `docs/cover-and-ebook.md`, `docs/privacy-school-info.md` (2026-10-28). 사용자 지시 원문: "개편해야할 내용들을 여기 모두 추가해뒀어 반영해줘."

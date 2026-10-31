@@ -87,7 +87,7 @@ test("artwork CAS, idempotency, completion and R2 keys are race safe", async () 
   const files = await readdir(new URL("../drizzle/", import.meta.url)); const migration = await read(`../drizzle/${files.find((name) => name.endsWith(".sql"))}`);
   const [route, runtime] = await Promise.all([read("../app/api/artworks/[id]/route.ts"), read("../db/runtime.ts")]);
   assert.match(migration, /PRIMARY KEY\(`artwork_id`, `student_id`, `request_id`\)/); assert.match(migration, /`last_mutation_id` text/);
-  assert.match(route, /db\.batch\(statements\)/); assert.match(route, /last_mutation_id = \?/); assert.match(route, /INSERT OR IGNORE INTO artwork_mutations/); assert.match(route, /status <> 'complete'/);
+  assert.match(route, /db\.batch\(statements\)/); assert.match(route, /last_mutation_id = \?/); assert.match(route, /INSERT INTO artwork_mutations[^`]*ON CONFLICT DO NOTHING/); assert.match(route, /status <> 'complete'/);
   assert.match(route, /if \(artwork\.status === "complete"\)/);
   // 소감 두 칸은 2026-09-20에 없앴다 — 완성의 조건이 아니다. 대신 완성 그림이 없으면 완성으로 넘어가지 않는다.
   assert.doesNotMatch(route, /!favoritePart \|\| !favoriteReason/);
@@ -108,7 +108,7 @@ test("duplicate recovery, logout and protected response regressions stay fixed",
   assert.match(student, /ORDER BY m\.created_at DESC, m\.id DESC LIMIT 50/); assert.match(student, /ORDER BY createdAt ASC, id ASC/);
   assert.match(student, /LEFT JOIN message_receipts r ON r\.message_id = m\.id AND r\.student_id = \?/);
   assert.doesNotMatch(student, /if \(messages\.results\.length\).*message_receipts/);
-  assert.match(student, /action === "ackTeacherMessage"/); assert.match(student, /INSERT OR IGNORE INTO message_receipts/);
+  assert.match(student, /action === "ackTeacherMessage"/); assert.match(student, /INSERT INTO message_receipts[^`]*ON CONFLICT DO NOTHING/);
   assert.match(student, /action === "ackTeacherMessages"/); assert.match(student, /rawMessageIds[\s\S]*slice\(0, 50\)/); assert.match(student, /db\.batch\(messageIds\.map/);
 });
 
