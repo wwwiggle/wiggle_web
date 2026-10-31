@@ -3,7 +3,7 @@ import { bookProductionSchema } from "@/lib/book-production-schema";
 import { createArtworksStore } from "@/db/adapters/artworks-store";
 import { createDatabase } from "@/db/adapters/database";
 import { PostgresD1 } from "@/db/adapters/postgres-d1";
-import { postgresSchemaStatements, postgresSetupStatements } from "@/db/postgres-schema";
+import { onceUntilSuccess, provisionPostgres } from "@/db/postgres-provision";
 import { upgradeMvp3Schema } from "@/lib/mvp3-schema-upgrade";
 import { runtimeEnvironment } from "@/lib/runtime/environment";
 
@@ -201,9 +201,8 @@ export async function provisionSchema(DB: D1Database) {
 }
 
 async function provisionPostgresSchema(DB: PostgresD1) {
-  await DB.sql.begin(async (tx) => {
-    for (const statement of [...postgresSetupStatements, ...postgresSchemaStatements]) await tx.unsafe(statement);
-  });
+  // 이미 세워져 있으면 조회 하나로 끝나고, 빠진 게 있을 때만 한 서버가 잠금을 잡고 세운다(db/postgres-provision.ts).
+  await provisionPostgres(DB.sql);
   await backfillEntryCodes(DB as unknown as D1Database);
 }
 
@@ -231,9 +230,9 @@ async function backfillEntryCodes(DB: D1Database) {
   for (let offset = 0; offset < statements.length; offset += 50) await DB.batch(statements.slice(offset, offset + 50));
 }
 
-let ready: Promise<void> | undefined;
+// 실패를 기억하지 않는다 — 한 번 실패한 서버가 꺼질 때까지 모든 요청을 실패시키던 문제(2026-11-01 운영 전환 직후 학생 입장 500).
+const schemaReady = onceUntilSuccess(() => provisionSchema(bindings().DB));
 
 export async function ensureSchema() {
-  if (!ready) ready = provisionSchema(bindings().DB);
-  return ready;
+  return schemaReady();
 }

@@ -1,5 +1,17 @@
 # Wiggle Web 현재 상태
 
+## 2026-11-01 운영 DB 전환(Turso → Supabase)과 동시 깨어남 충돌 수정 (`claude/schema-concurrency`)
+
+- **전환.** 새벽 3시(일요일) 점검 모드(`WIGGLE_MAINTENANCE=1`) 중 운영 Turso → 운영 Supabase `web` 최종 복사: 44표·21,723행, 9초, **44표 모두 행 수·해시 일치**. 용환님이 Vercel Production에 `DATABASE_URL`을 넣고 점검 변수를 지운 뒤 재배포했다. 직후 학생 그림책 저장이 Supabase에 쌓이는 것을 확인했다.
+- **사고.** 학생 입장 확인(`/api/student` entryStatus)이 계속 500. Postgres 오류 "tuple concurrently updated"(용환님 쪽 로그). 원인: 서버 여러 대가 함께 깨어나 `ensureSchema`의 구조 변경(CREATE OR REPLACE FUNCTION 등)을 동시에 돌렸고, `ensureSchema`가 실패한 약속을 기억해 그 서버는 꺼질 때까지 `ensureSchema`를 거치는 요청(요청 횟수 제한 → 입장)을 모두 실패시켰다. 그림책 저장은 `ensureSchema`를 거치지 않아 멀쩡했다. 운영 Supabase에서 같은 87문장을 혼자 돌리면(롤백) 모두 정상이었다.
+- **수정** `db/postgres-provision.ts`
+  - 표·칸·인덱스·함수가 다 있으면 구조 변경 없이 조회 하나로 끝낸다.
+  - 빠진 게 있을 때만 `pg_advisory_xact_lock`(트랜잭션 잠금 — 풀러 트랜잭션 모드라 세션 잠금은 안 된다)을 잡고 한 서버만 세운다. 기다린 서버는 다시 확인하고 나간다.
+  - 이미 있는 표에 새로 더한 칸은 `ALTER TABLE … ADD COLUMN IF NOT EXISTS`로 붙인다(전에는 `CREATE TABLE IF NOT EXISTS`가 건너뛰어 운영에 칸이 안 생길 수 있었다).
+  - `onceUntilSuccess`: 실패를 기억하지 않고 다음 요청에서 다시 한다.
+- 검증: `tests/postgres-provision.test.mjs` — 8대 동시 깨어남 무오류, 두 번째부터 구조 변경 없음, 지운 칸 복구, 실패 뒤 재시도. 같은 상황을 예전 방식으로 돌리면 40번 중 34번 "tuple concurrently updated"(운영과 같은 오류)로 재현됨을 확인. production build, lint 오류 0(경고 14), **Turso 464/464(+Postgres 전용 2 건너뜀)**, **Postgres 456/456(+1)**.
+- 남은 일: 이 PR 배포 뒤 운영 학생 입장 확인 200/404 확인, `check-deployed` 운영 실측, 며칠 뒤 Turso 토큰 전체 무효화(`docs/db-cutover.md`).
+
 ## 2026-11-01 점검 모드와 DB 이사 당일 진행표 (`claude/maintenance-mode`)
 
 - 사용자 결정 "A 진행하자": 서버는 Vercel 그대로 두고 DB만 먼저 Supabase로 옮긴다. 당일 순서는 `docs/db-cutover.md`.
