@@ -162,4 +162,6 @@ test("HTTP 그림책 주문: 가격 설정 전 차단, 견적서·입금 계좌,
   const drawPage = await (await server.fetch("/student/draw/new?mode=free")).text();
   assert.match(drawPage, /그림 그리기는 유료 요금제 기능이에요/);
   assert.doesNotMatch(drawPage, /도화지를 펴고 있어요/);
+  // 「내 그림」 보관함과 완성 그림 보기도 잠긴다(2026-11-01).
+  for (const path of ["/student/archive", "/student/archive/any_artwork"]) assert.match(await (await server.fetch(path)).text(), /그림 그리기는 유료 요금제 기능이에요/, path);
 });
