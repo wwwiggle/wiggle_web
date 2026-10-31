@@ -34,12 +34,12 @@ export function StorybookCoverSpread({ title, document, renderPage, onClose }: {
       <div className="cover-spread-labels" aria-hidden="true"><span>뒷표지</span><span>책등</span><span>앞표지</span></div>
       <div className="cover-spread-sheet" style={{ gridTemplateColumns: `243fr minmax(30px, ${spineMm}fr) 243fr` }}>
         {panel(backIndex === null ? undefined : document.pages[backIndex], "back")}
-        <div className="cover-spread-spine" aria-label={`책등 ${spineMm}mm`}>{spineHasText ? <span>{[spine.title, spine.author].filter(Boolean).join("   ")}</span> : <small>{spineMm}mm</small>}</div>
+        <div className="cover-spread-spine" aria-label={`책등 ${spineMm}mm`}>{spineHasText ? <><span>{[spine.title, spine.author].filter(Boolean).join("   ")}</span><small className="cover-spread-publisher">{spine.publisher}</small></> : <small>{spineMm}mm</small>}</div>
         {panel(document.pages[0], "front")}
       </div>
       <ul className="cover-spread-notes">
         <li>점선은 접히는 선이에요. 책등 폭은 지금 쪽 수로 계산한 값({spineMm}mm)이고, 쪽 수가 바뀌면 다시 계산돼요.</li>
-        <li>책등에는 책 제목과 앞표지의 ‘글 / 그림’ 칸이 자동으로 들어가요.{!spine.author && " 앞표지에 지은이를 적으면 함께 들어가요."}</li>
+        <li>책등에는 책 제목, 앞표지의 ‘글 / 그림’ 칸(지은이), 펴낸 곳 {spine.publisher}가 자동으로 들어가요.{!spine.author && " 앞표지에 지은이를 적으면 함께 들어가요."}</li>
         <li>표지 그림은 가장자리에서 1cm 안쪽에 맞춰 인쇄돼요. 뒷표지 오른쪽 아래 바코드 자리는 비워 두세요.</li>
       </ul>
     </section>

@@ -186,8 +186,11 @@ export function validateStorybookDocument(value: unknown): StorybookDocument | n
 // Applying a layout is explicit. Loading a saved book must never merge, truncate or move its contents.
 // Extra text, illustrations and PDF backgrounds survive every template change.
 export function applyStorybookTemplate(page: StorybookPage, template: StorybookTemplate, makeId: () => string, context: StorybookTemplateContext = {}): StorybookPage {
-  if (template === "blank" || template === "back" || template === "pattern") return { ...page, template };
   const autoText = (role: StorybookElement["textRole"]) => cleanStoryText((role === "title" ? context.title : role === "credit" ? context.credit : undefined)?.trim() ?? "").slice(0, 120) || undefined;
+  // 양식을 바꾸면 앞 양식이 만든 글 칸 가운데 아이가 손대지 않은 것(빈 칸, 자동 문구 그대로)은 치운다.
+  // 아이가 직접 쓴 글은 그대로 남긴다(2026-11-01: 내지→속표지→작가의 말을 눌러 보면 문구가 계속 쌓이던 문제).
+  const untouched = (element: StorybookElement) => element.type === "text" && (!element.text?.trim() || (!!element.textRole && (element.text === "작가의 말" || element.text.trim() === autoText(element.textRole))));
+  if (template === "blank" || template === "back" || template === "pattern") return { ...page, template, elements: page.elements.filter(element => !untouched(element)) };
   const fields: Partial<StorybookElement>[] = template === "cover" || template === "title" ? [
     { textRole: "title", x: .08, y: template === "cover" ? .08 : .18, width: .84, height: .2, fontSize: .065, align: "center" },
     { textRole: "credit", x: .12, y: .82, width: .76, height: .09, fontSize: .026, align: "center" },
@@ -209,7 +212,7 @@ export function applyStorybookTemplate(page: StorybookPage, template: StorybookT
       elements.push(element); used.add(element.id);
     }
   }
-  return { ...page, template, elements };
+  return { ...page, template, elements: elements.filter(element => used.has(element.id) || !untouched(element)) };
 }
 
 export function createStorybookTextElement(id = "element_startertext0001"): StorybookElement {

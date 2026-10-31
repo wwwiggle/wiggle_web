@@ -32,7 +32,7 @@ test("그리던 그림을 자동으로 열지 않는다", async () => {
   assert.match(desk, /\{drawing \? "이어 그리기" : "그림 보기"\}/);
   assert.match(desk, /href: drawing \? `\/student\/draw\/\$\{encodeURIComponent\(artwork\.id\)\}` : `\/student\/archive\/\$\{encodeURIComponent\(artwork\.id\)\}`/);
   // 잠긴 동안(유료 요금제) 그리다 만 그림 카드는 링크가 아니라 누를 수 없는 span이다.
-  assert.match(desk, /const locked = drawing && DRAWING_LOCKED;\r?\n  const Card = locked \? "span" : "a";/);
+  assert.match(desk, /const locked = DRAWING_LOCKED;\r?\n  const Card = locked \? "span" : "a";/);
 });
 
 test("시안을 배경으로 깔지 않고 장식만 따로 놓는다", async () => {
