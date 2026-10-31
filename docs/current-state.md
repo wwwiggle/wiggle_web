@@ -1,5 +1,7 @@
 # Wiggle Web 현재 상태
 
+> 2026-10-31 저장소가 `wwwiggle/wiggle_web`으로 옮겨졌다. 네 명이 이 저장소에서 바로 기능 브랜치 → PR → 다른 사람 1명 승인 → `main` 병합(= Vercel 운영 배포)으로 작업한다.
+
 ## 2026-10-31 그림책 만들기 개편 — book_creator TODO 9개 반영 (검증·PR #36 제출 완료)
 
 - 출처: 사용자의 `qudcks1940/book_creator` `TODO.md`·`docs/cover-and-ebook.md`·`docs/privacy-school-info.md`. 결정·선택 원문은 `product-decisions.md` 「2026-10-31 그림책 만들기 개편」, 업체·법률 확인 항목은 `pending-decisions.md`.
