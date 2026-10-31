@@ -1,5 +1,12 @@
 # Wiggle Web 현재 상태
 
+## 2026-11-01 DB 이사 리허설: 운영 Turso → 개발 Supabase
+
+- 운영 Turso(`wiggle-yonghwan86`)를 읽기만 해서 개발 Supabase `web`에 복사(`scripts/migrate-turso-to-postgres.mjs --truncate-target`). 44표·약 2만 2천 행, 복사 10초·전체 22초.
+- 42표는 행 수·내용 해시가 같았다. 다른 2표(`teacher_sessions` 1행의 `last_used_at`, `rate_limits` 1행의 `count`)는 복사하는 사이 운영이 바꾼 값이었다 — 칸 단위로 비교해 확인. 이사 당일에는 점검 모드로 쓰기를 멈춘 뒤 복사해야 한다.
+- 확인 뒤 개발 Supabase `web`의 운영 복사본(학생 실명 포함)을 모두 지웠다(44표 0행).
+- ⚠️ 받은 Turso 토큰이 읽기 전용이 아니라 `rw`이고 채팅에 노출됐다. 맥 `.env.local`에 `# vercel-only:` 주석으로만 둔다. 하나만 끊을 수 없어(전체 무효화는 운영 Vercel 토큰도 끊음) **이사 당일 Turso를 안 쓰게 된 뒤 `turso db tokens invalidate`로 정리**한다.
+
 ## 2026-11-01 Cloudflare 이사 2단계: 그림책 그리기 서버 분리 (`claude/render-service`, 로컬 검증)
 
 - 이유: Cloudflare Workers에서는 `resvg`·`sharp`(그림책 쪽 그리기·인쇄 이미지 다듬기)가 돌지 않는다. 책 한 권 그림이 최대 80MB라 Worker 메모리(128MB)로 모으는 것도 위험하다. 사용자 선택 "C": 지금 코드를 그대로 쓰는 그리기 서버를 Cloudflare Containers에 둔다.
