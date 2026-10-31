@@ -53,9 +53,12 @@ export function coverCredit(document: Pick<StorybookDocument, "pages">) {
   return meaningfulText(cover?.elements.find(element => element.type === "text" && element.textRole === "credit"));
 }
 
-/** Text placed on the printed spine. Empty strings mean "leave the spine plain". */
+/** 책등 아래쪽에 들어가는 펴낸 곳 이름(2026-11-01 사용자 결정: 회사명 픽쳐 → 영문 Ficture). */
+export const BOOK_PUBLISHER = "Ficture";
+
+/** Text placed on the printed spine: 제목·지은이(앞표지 글 / 그림 칸)·펴낸 곳. Empty strings mean "leave it out". */
 export function spineLabel(title: string, document: Pick<StorybookDocument, "pages">) {
-  return { title: title.trim().slice(0, 40), author: coverCredit(document).replace(/\s+/g, " ").slice(0, 24) };
+  return { title: title.trim().slice(0, 40), author: coverCredit(document).replace(/\s+/g, " ").slice(0, 24), publisher: BOOK_PUBLISHER };
 }
 
 /** Spine lettering size in millimetres; null when the spine is too thin to hold legible text. */
@@ -84,29 +87,43 @@ function structurePage(template: StorybookTemplate, makeId: MakeId, context: Str
   return applyStorybookTemplate(page, template, () => makeId("element"), context);
 }
 
+/** 책의 뼈대가 되는 쪽(앞표지·면지·작가의 말·속표지·뒷표지). 지우거나 복제하지 않는다. */
+export function isStructurePage(document: Pick<StorybookDocument, "pages">, index: number) {
+  const role = pageRole(document, index), template = document.pages[index]?.template;
+  return role !== "inner" || template === "pattern" || template === "author" || template === "title";
+}
+
 /**
- * Adds the standard book parts that are still missing:
- * 앞표지 → 면지 → 작가의 말 → 속표지 → 본문 … → 면지 → 뒷표지.
- * Existing pages are never moved, edited or removed.
+ * 2026-11-01 사용자 결정: 책은 처음부터 「앞표지 → 면지 → 작가의 말 → 속표지 → 내지 … → 뒷표지」 꼴을 갖춘다.
+ * 빠진 부분만 더하고, 있는 쪽은 옮기거나 고치거나 지우지 않는다.
  */
 export function completeBookStructure(document: StorybookDocument, makeId: MakeId, context: StructureContext, maxPages = MAX_STORYBOOK_PAGES) {
   const has = (template: StorybookTemplate) => document.pages.some(page => page.template === template);
   const front: StorybookPage[] = [];
-  const back: StorybookPage[] = [];
   const added: string[] = [];
-  const addPattern = !has("pattern");
-  if (addPattern) { front.push(structurePage("pattern", makeId, context)); added.push("앞 면지"); }
+  if (!has("pattern")) { front.push(structurePage("pattern", makeId, context)); added.push("면지"); }
   if (!has("author")) { front.push(structurePage("author", makeId, context)); added.push("작가의 말"); }
   if (!has("title")) { front.push(structurePage("title", makeId, context)); added.push("속표지"); }
-  if (addPattern) { back.push(structurePage("pattern", makeId, context)); added.push("뒤 면지"); }
   const needsBack = !hasBackCover(document);
   if (needsBack) added.push("뒷표지");
-  const total = document.pages.length + front.length + back.length + (needsBack ? 1 : 0);
+  const total = document.pages.length + front.length + (needsBack ? 1 : 0);
   if (!added.length) return { document, added, error: "" };
-  if (total > maxPages) return { document, added: [], error: `책 구성을 더하면 ${total}쪽이 되어 최대 ${maxPages}쪽을 넘어요. 쪽을 조금 줄인 뒤 다시 눌러 주세요.` };
+  if (total > maxPages) return { document, added: [], error: `책 구성을 더하면 ${total}쪽이 되어 최대 ${maxPages}쪽을 넘어요. 쪽을 조금 줄인 뒤 다시 열어 주세요.` };
   const pages = [...document.pages];
   const backCover = needsBack ? structurePage("back", makeId, context) : pages.pop()!;
-  return { document: { ...document, pages: [pages[0], ...front, ...pages.slice(1), ...back, backCover] }, added, error: "" };
+  const cover = pages[0].template ? pages[0] : applyStorybookTemplate(pages[0], "cover", () => makeId("element"), context);
+  return { document: { ...document, pages: [cover, ...front, ...pages.slice(1), backCover] }, added, error: "" };
+}
+
+/** 새 그림책: 뼈대 5쪽 + 내지로 최소 쪽 수(24쪽)를 채운다. */
+export function newStructuredStorybook(format: StorybookDocument["format"], makeId: MakeId, minPages = 24): StorybookDocument {
+  const context = { title: "", credit: "" };
+  const cover = structurePage("cover", makeId, context);
+  const inner = Array.from({ length: Math.max(1, minPages - 5) }, () => structurePage("inner", makeId, context));
+  return {
+    schemaVersion: 1, format,
+    pages: [cover, structurePage("pattern", makeId, context), structurePage("author", makeId, context), structurePage("title", makeId, context), ...inner, structurePage("back", makeId, context)],
+  };
 }
 
 export type PatternDensity = "few" | "normal" | "many";
@@ -168,6 +185,29 @@ export function patternElements(options: { assetId: string; imageAspect: number;
     }
   }
   return elements;
+}
+
+/**
+ * 패턴 면지(2026-11-01): 그림 한 장을 3·2·3 엇갈림으로 8장 놓는다. 그림 비율은 지키고 칸 안에 들어가게 줄인다.
+ * pageAspect = 쪽 가로/세로, imageAspect = 그림 가로/세로.
+ */
+export function patternEightElements(options: { assetId: string; imageAspect: number; pageAspect: number; makeId: () => string }): StorybookElement[] {
+  const imageAspect = Math.min(10, Math.max(0.1, Number.isFinite(options.imageAspect) ? options.imageAspect : 1));
+  const cell = 1 / 3, box = cell * 0.78;
+  // box는 쪽 너비·높이에 대한 비율이다. 그림 비율에 맞춰 가로·세로 중 긴 쪽을 box에 맞춘다.
+  let width = box, height = width * options.pageAspect / imageAspect;
+  if (height > box) { height = box; width = height * imageAspect / options.pageAspect; }
+  const rows: number[][] = [[1, 3, 5], [2, 4], [1, 3, 5]];
+  return rows.flatMap((columns, row) => columns.map((column, index) => ({
+    id: options.makeId(), type: "image" as const, assetId: options.assetId,
+    x: round4(column / 6 - width / 2), y: round4((row + 0.5) * cell - height / 2), width: round4(width), height: round4(height),
+    rotation: 0, zIndex: row * 3 + index + 1, opacity: 1, locked: false, aspectRatio: round4(imageAspect),
+  })));
+}
+
+/** 패턴 쪽의 그림을 새 패턴으로 통째로 바꾼다. 글 칸은 남긴다. */
+export function replacePattern(page: StorybookPage, elements: StorybookElement[]): StorybookPage {
+  return { ...page, template: "pattern", elements: [...elements, ...page.elements.filter(element => element.type !== "image")] };
 }
 
 /** Replaces the page's copies of the chosen picture with a fresh pattern; other content stays. */

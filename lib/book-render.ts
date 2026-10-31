@@ -114,7 +114,7 @@ export function printPageCount(original: number, spec: PrintSpec) {
   return count;
 }
 /** Rendered page order: images[0] is the front cover; with backCover the last image is the back cover. */
-export type PrintCoverOptions = { backCover?: boolean; spine?: { title: string; author: string } };
+export type PrintCoverOptions = { backCover?: boolean; spine?: { title: string; author: string; publisher?: string } };
 export async function printPdfs(images: Buffer[], spec: PrintSpec, size: PrintSize, title: string, options: PrintCoverOptions = {}) {
   assertBookPrintSpec(spec);
   const backImage = options.backCover && images.length > 1 ? images[images.length - 1] : undefined;
@@ -158,15 +158,28 @@ export async function printPdfs(images: Buffer[], spec: PrintSpec, size: PrintSi
   }
   const spineFont = spineFontSizeMm(size.spineWidthMm);
   const spineText = [options.spine?.title, options.spine?.author].map(value => value?.trim() ?? "").filter(Boolean).join("   ");
-  if (spineFont && spineText) {
+  const publisher = options.spine?.publisher?.trim() ?? "";
+  if (spineFont && (spineText || publisher)) {
     cover.registerFontkit(fontkit);
     const font = await cover.embedFont(await readFile(FONT_PATH), { subset: true });
+    const color = rgb(0.16, 0.2, 0.18);
     // Korean spines read top to bottom: the baseline runs downward along the spine centre line.
-    const available = panelH - pt(24);
-    let fontSize = pt(spineFont);
-    while (fontSize > pt(2.5) && font.widthOfTextAtSize(spineText, fontSize) > available) fontSize *= 0.92;
-    const textWidth = Math.min(available, font.widthOfTextAtSize(spineText, fontSize));
-    p.drawText(spineText, { x: center - fontSize * 0.36, y: (p.getHeight() + textWidth) / 2, size: fontSize, font, color: rgb(0.16, 0.2, 0.18), rotate: degrees(-90) });
+    // 제목·지은이는 가운데, 펴낸 곳(Ficture)은 아래쪽 끝에 둔다.
+    const top = (p.getHeight() + panelH) / 2 - pt(12), bottom = (p.getHeight() - panelH) / 2 + pt(12);
+    let publisherTop = bottom;
+    if (publisher) {
+      const size = pt(spineFont) * 0.8, width = font.widthOfTextAtSize(publisher, size);
+      publisherTop = bottom + width;
+      p.drawText(publisher, { x: center - size * 0.36, y: publisherTop, size, font, color, rotate: degrees(-90) });
+      publisherTop += pt(8);
+    }
+    if (spineText) {
+      const available = top - publisherTop;
+      let fontSize = pt(spineFont);
+      while (fontSize > pt(2.5) && font.widthOfTextAtSize(spineText, fontSize) > available) fontSize *= 0.92;
+      const textWidth = Math.min(available, font.widthOfTextAtSize(spineText, fontSize));
+      p.drawText(spineText, { x: center - fontSize * 0.36, y: (top + publisherTop + textWidth) / 2, size: fontSize, font, color, rotate: degrees(-90) });
+    }
   }
   return { cover: await cover.save(), inner: await inner.save(), pageCount: count, addedPages: count - innerImages.length };
 }

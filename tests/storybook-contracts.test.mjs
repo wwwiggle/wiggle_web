@@ -106,10 +106,14 @@ test("학생 화면에 실제 그림책 진입·편집·가져오기·미리보�
   assert.match(demo, /artworkId: artwork\.id/);
   assert.doesNotMatch(editor, /T 글 넣기/);
   assert.doesNotMatch(editor, /✏️ 이야기 쓰기/);
-  assert.match(editor, /🎨 내 그림/);
+  // 2026-11-01 기능 최소화: 내 그림(그리기는 유료)·그림 붙여넣기·책 구성 갖추기·쪽 이동·쪽 양식·전체 복제 단추를 뺐다.
+  for (const removed of [/🎨 내 그림/, /📋 그림 붙여넣기/, /책 구성 갖추기/, /← 쪽 이동|쪽 이동 →/, /쪽 양식·배경/, /StorybookDuplicateButton/]) assert.doesNotMatch(editor, removed);
   assert.match(editor, /🖼️ 새 그림/);
   assert.match(editor, /🌄 배경 넣기/);
-  assert.match(editor, /페이지 전체 배경 넣기/);
+  assert.match(editor, /배경 지우기/);
+  assert.match(editor, /🔁 패턴 면지/);
+  assert.match(editor, /onDrop=\{\(event\) => \{ event\.preventDefault\(\); setDropActive\(false\); const file = droppedImage\(event\)/, "쪽 위로 그림을 끌어다 놓을 수 있다");
+  assert.match(editor, /<header className="storybook-editor-header">.*📖 표지 펼쳐 보기.*<\/header>/, "표지 펼쳐 보기는 맨 위에 있다");
   assert.doesNotMatch(editor, /changeFormat|storybook-format-switcher|storybook-inspector-formats/);
   assert.match(editor, /쪽 복제/);
   assert.match(editor, /↶ 되돌리기/);

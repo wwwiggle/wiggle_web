@@ -24,7 +24,9 @@
 .cover-spread-empty b{font-size:16px}
 .cover-spread-empty span{font-size:13px;line-height:1.5}
 .cover-spread-barcode{position:absolute;z-index:10004;display:grid;place-items:center;border:2px dashed #b48a2c;background:#fffaf0e6;color:#6b4f12;font-size:clamp(7px,3.2cqi,13px);font-weight:800;line-height:1.15;text-align:center;overflow:hidden;padding:2px}
-.cover-spread-spine{display:grid;place-items:center;min-width:30px;background:#e2d8bf;overflow:hidden}
+.cover-spread-spine{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px 0;min-width:30px;background:#e2d8bf;overflow:hidden}
+.cover-spread-spine>span{flex:1;display:flex;align-items:center;justify-content:center}
+.cover-spread-spine .cover-spread-publisher{font-weight:800;letter-spacing:.04em;color:#283428}
 .cover-spread-spine span{writing-mode:vertical-rl;text-orientation:sideways;white-space:nowrap;font-weight:800;font-size:13px;color:#283428;max-height:100%;overflow:hidden;text-overflow:ellipsis}
 .cover-spread-spine small{writing-mode:vertical-rl;font-size:11px;color:#6d6650}
 .cover-spread-notes{margin:14px 0 0;padding-left:20px;font-size:14px;line-height:1.7}
@@ -82,3 +84,18 @@
 }
 @media(max-width:400px){.ebook-viewer .ebook-icon{display:none}}
 @media(max-height:700px) and (max-width:680px){.storybook-completion-cover{width:min(100%,170px)}.storybook-completion h2{font-size:20px}}
+
+/* 그림 끌어다 놓기(2026-11-01): 쪽 위로 그림 파일을 끌어오면 테두리와 안내가 뜬다. */
+.storybook-stage-wrap{position:relative}
+.storybook-stage-wrap.is-drop-target .storybook-stage{outline:4px dashed #2f6b3a;outline-offset:6px}
+.storybook-drop-hint{position:absolute;inset:12px;z-index:20;display:grid;place-items:center;border-radius:16px;background:#2f6b3a1f;color:#1f4a28;font-size:20px;font-weight:900;pointer-events:none}
+
+/* 패턴 면지 창 */
+.storybook-pattern-modal{width:min(560px,100%)}
+.storybook-pattern-modal>p{margin:8px 0 14px;font-size:15px;line-height:1.6}
+.storybook-pattern-drop{display:grid;place-items:center;gap:8px;width:100%;min-height:220px;padding:24px;border:3px dashed #9fb39a;border-radius:18px;background:#f7fbf3;color:#294329;font:inherit;text-align:center;cursor:pointer}
+.storybook-pattern-drop b{font-size:44px;line-height:1}
+.storybook-pattern-drop span{font-size:17px;font-weight:800}
+.storybook-pattern-drop small{font-size:13px;color:#55624f}
+.storybook-pattern-drop:hover,.storybook-pattern-drop.is-drop-target{border-color:#2f6b3a;background:#eaf5e2}
+.storybook-pattern-drop:disabled{cursor:progress;opacity:.7}
