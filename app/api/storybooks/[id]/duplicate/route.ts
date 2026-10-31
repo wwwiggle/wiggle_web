@@ -34,9 +34,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   // Images are immutable objects (the same model as artwork import). Each copy has its own
   // asset rows; editing uploads a new object, never overwrites or deletes the source object.
   await db.batch([
-    db.prepare(`INSERT OR IGNORE INTO storybooks(id, student_id, classroom_id, title, document_json, schema_version, status) SELECT ?, ?, ?, ?, ?, ?, 'draft' WHERE EXISTS (SELECT 1 FROM storybooks WHERE id = ? AND student_id = ? AND revision = ?)`)
+    db.prepare(`INSERT INTO storybooks(id, student_id, classroom_id, title, document_json, schema_version, status) SELECT ?, ?, ?, ?, ?, ?, 'draft' WHERE EXISTS (SELECT 1 FROM storybooks WHERE id = ? AND student_id = ? AND revision = ?) ON CONFLICT DO NOTHING`)
       .bind(copyId, student.id, source.classroomId, title, JSON.stringify(document), source.schemaVersion, source.id, student.id, source.revision),
-    ...assets.map(asset => db.prepare(`INSERT OR IGNORE INTO storybook_assets(id, storybook_id, student_id, source_type, source_artwork_id, object_key, content_type, byte_size) SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM storybooks WHERE id = ? AND student_id = ?)`)
+    ...assets.map(asset => db.prepare(`INSERT INTO storybook_assets(id, storybook_id, student_id, source_type, source_artwork_id, object_key, content_type, byte_size) SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM storybooks WHERE id = ? AND student_id = ?) ON CONFLICT DO NOTHING`)
       .bind(assetIds.get(asset.id)!, copyId, student.id, asset.sourceType, asset.sourceArtworkId, asset.objectKey, asset.contentType, asset.byteSize, copyId, student.id)),
   ]);
   const copied = await ownedStorybook(copyId, student.id);

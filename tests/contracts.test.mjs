@@ -10,7 +10,7 @@ test("binds DB and ARTWORKS through host-neutral adapters and ships a migration"
   const [runtime, tursoAdapter, storeAdapter, migration, snapshot] = await Promise.all([read("../db/runtime.ts"), read("../db/adapters/turso-d1.ts"), read("../db/adapters/artworks-store.ts"), read(`../drizzle/${migrationName}`), read("../drizzle/meta/0002_snapshot.json")]);
   // 관문은 db/runtime.ts 하나다. 호출부는 D1Database/R2Bucket 표면만 알고, 실제 구현은 어댑터가 갈아 끼운다.
   assert.match(runtime, /const environment = runtimeEnvironment\(\)/);
-  assert.match(runtime, /DB: createTursoD1\(environment\)/); assert.match(runtime, /ARTWORKS: createArtworksStore\(environment\)/);
+  assert.match(runtime, /DB: createDatabase\(environment\)/); assert.match(runtime, /ARTWORKS: createArtworksStore\(environment\)/);
   assert.doesNotMatch(runtime, /cloudflare:workers/);
   // 운영에서 자격증명이 비면 조용히 로컬 폴백으로 굴러가지 않고 죽어야 한다.
   assert.match(tursoAdapter, /TURSO_DATABASE_URL이 설정되지 않았어요/); assert.match(storeAdapter, /R2 S3 자격증명\(R2_S3_\*\)이 설정되지 않았어요/);

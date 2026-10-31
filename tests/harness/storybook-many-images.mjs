@@ -8,8 +8,8 @@ import {emptyStorybookDocument} from '../../lib/storybook-model.ts';
 export async function seedManyImagesBook(server, index, count = 1000) {
  const student=`many_student_${index}`,token=randomUUID(),expiresAt=new Date(Date.now()+3600000).toISOString();
  await server.DB.batch([
-  server.DB.prepare("INSERT OR IGNORE INTO teachers(id,email,display_name) VALUES('many_teacher','many@example.test','교사')"),
-  server.DB.prepare("INSERT OR IGNORE INTO classrooms(id,teacher_id,display_name,class_code,join_token) VALUES('many_class','many_teacher','검증반','1849','many_join')"),
+  server.DB.prepare("INSERT INTO teachers(id,email,display_name) VALUES('many_teacher','many@example.test','교사') ON CONFLICT DO NOTHING"),
+  server.DB.prepare("INSERT INTO classrooms(id,teacher_id,display_name,class_code,join_token) VALUES('many_class','many_teacher','검증반','1849','many_join') ON CONFLICT DO NOTHING"),
   server.DB.prepare("INSERT INTO student_profiles(id,classroom_id,nickname,animal,last_activity_at) VALUES(?,'many_class',?,'cat',CURRENT_TIMESTAMP)").bind(student,`학생 ${index}`),
   server.DB.prepare('INSERT INTO device_sessions(token_hash,student_id,expires_at,last_used_at) VALUES(?,?,?,CURRENT_TIMESTAMP)').bind(await sha256(token),student,expiresAt),
  ]);
