@@ -10,11 +10,13 @@
 - 조치(사용자 지시 "재연결하고 배포해"): `vercel git disconnect` → `vercel git connect https://github.com/wwwiggle/wiggle_web`, 그다음 main `70cccea`를 Git 소스로 운영 배포 → READY. `www.kkumtle.app`·`kkumtle.app`·`wiggleweb.vercel.app`이 새 배포를 가리킨다. 직전 운영 배포(`5ba702c`)는 Vercel에 남아 있어 되돌릴 수 있다.
 - 운영 스모크: `/`·`/student` 200, `/teacher`·구글 로그인 시작 307, 학생 API 지원 안 하는 요청 400·없는 수업 코드 404(정상 문구), 리전 icn1.
 - 남은 확인
-  - 재연결 뒤 **자동** 배포는 다음 main 커밋에서 확인한다(이 PR 병합이 첫 확인).
+  - 재연결 뒤 **자동** 배포: PR #38 병합(`b11211d`) 3초 뒤 Vercel이 운영 배포를 스스로 만들었다 — GitHub 알림 경로는 회복됐다(그 배포는 아래 건너뛰기 설정 실수로 취소됐다).
   - #39(DB 겸용 코드)가 저장 경로를 건드려 `check-deployed` 운영 실측이 필요하다 — 검증용 학생이 생기므로 사용자 확인 뒤.
   - Vercel Preview 환경의 `WIGGLE_DATA_ENV`가 `production`이라, 코드의 안전장치("preview 실행 환경의 WIGGLE_DATA_ENV는 'preview'여야 해요")에 걸려 미리보기 빌드가 실패한다. Preview용 DB를 정하는 `preview/supabase` 작업 때 함께 정한다.
     Preview 환경 변수(`WIGGLE_DATA_ENV`·`TURSO_*`·`R2_S3_BUCKET` 등)가 69일 전부터 Production과 한 항목으로 묶여 운영 값을 가리킨다. `WIGGLE_DATA_ENV`만 `preview`로 바꾸면 미리보기가 운영 DB에 쓰게 되므로 그렇게 하지 않는다.
-  - 그때까지 임시로(사용자 지시 "우선 미리보기 꺼줘") Vercel 프로젝트의 **Ignored Build Step**을 `[ "$VERCEL_ENV" != "production" ]`로 두어 main 외 브랜치 빌드를 건너뛴다(API로 만든 시험 미리보기가 CANCELED로 끝남 확인). Preview DB를 붙이면 이 설정을 지운다(Vercel → Settings → Git, 또는 API 필드 `commandForIgnoringBuildStep`).
+  - 그때까지 임시로(사용자 지시 "우선 미리보기 꺼줘") Vercel 프로젝트의 **Ignored Build Step**을 `[ -n "$VERCEL_GIT_COMMIT_REF" ] && [ "$VERCEL_GIT_COMMIT_REF" != "main" ]`로 두어 main 외 브랜치 빌드를 건너뛴다. 브랜치 값이 비면 빌드하는 쪽으로 둔다. Preview DB를 붙이면 이 설정을 지운다(Vercel → Settings → Git, 또는 API 필드 `commandForIgnoringBuildStep`).
+  - ⚠️ 처음 넣은 `[ "$VERCEL_ENV" != "production" ]`는 **운영 배포까지 취소했다**(PR #38 병합의 자동 배포 `b11211d` CANCELED). 이 단계에서는 `VERCEL_ENV`가 비어 있었다. 미리보기로만 시험해 놓쳤다. 조건을 위처럼 바꾼 뒤 사용자 지시("배포해")로 `b11211d`를 다시 운영 배포 → READY, 브랜치 시험 미리보기는 CANCELED.
+  - `b11211d` 운영 스모크: `/`·`/student` 200, `/teacher` 307, 학생 API 400·없는 수업 코드 404(정상 문구). 수업 코드 틀린 시도 상한(IP 30회/10분)은 운영에서 일부러 채우지 않았다.
 - 이 클론을 `vercel link`하자 CLI가 `.env.local`에 `VERCEL_OIDC_TOKEN` 활성 줄을 만들었다. 규칙대로 `# vercel-only:` 주석으로 바꿨다. 다른 기기에서 `vercel link`·`vercel env pull`을 쓰면 같은 일이 생긴다.
 - PR #38(`claude/security-deps-entry-lock`)에 main `70cccea`를 병합해 충돌(`CLAUDE.md`·이 문서)을 풀었다. 새로 더한 `rate_limits` 조회·`substr` 삭제는 #39의 Postgres 어댑터(`?`→`$n`, bigint→number)로도 그대로 돈다. 검증: production build 포함 **457/457**, typecheck, lint 오류 0(경고 14), 운영 의존성 감사 심각·높음 0(보통 9 exceljs).
 

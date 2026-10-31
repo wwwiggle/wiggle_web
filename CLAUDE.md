@@ -70,6 +70,7 @@ git diff --check main...HEAD
 ## 배포 (GitHub → Vercel)
 
 - ⚠️ **운영은 `origin`(`wwwiggle/wiggle_web`)의 `main`을 빌드한다.** 2026-10-31 저장소 이전 직후 GitHub 푸시 알림이 Vercel에 닿지 않아 `5ba702c` 뒤의 main 커밋이 하나도 배포되지 않았다(Vercel 설정에는 연결된 것으로 보였다). 같은 날 Vercel CLI로 Git 연결을 끊었다가 다시 연결하고 `70cccea`를 직접 운영 배포했다. main에 새 커밋이 들어왔는데 몇 분 안에 GitHub 커밋 상태에 `Vercel`이 안 붙으면 이 일을 의심한다.
+- Vercel **Ignored Build Step**은 운영(main)을 절대 건너뛰면 안 된다. 바꿀 때는 미리보기뿐 아니라 운영 배포도 건너뛰지 않는지 확인한다 — 이 단계에서는 `VERCEL_ENV`가 비어 있어 `VERCEL_ENV`로 고른 조건이 운영 배포를 취소한 일이 있다(2026-11-01).
 - 운영 주소: **`https://www.kkumtle.app`** — Vercel 프로젝트 `wiggle-web`(서울 리전 icn1). 옛 `wiggleweb.vercel.app`은 같은 프로젝트의 서브도메인이고, `wiggle-web.vercel.app`은 타인 소유이므로 사용·안내 금지.
 - 운영 환경 변수는 Vercel 대시보드에서만 관리한다(9종: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `R2_S3_ENDPOINT`, `R2_S3_BUCKET`, `R2_S3_ACCESS_KEY_ID`, `R2_S3_SECRET_ACCESS_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPENAI_API_KEY`). 값에 따옴표를 넣지 않는다.
 - DB(Turso)는 첫 요청의 `ensureSchema()`가 자가 프로비저닝한다. **2026-10-31부터 Supabase로 이사 중**: `DATABASE_URL`이 있으면 Supabase Postgres(`web` 스키마, `db/postgres-schema.ts`), 없으면 Turso. SQLite 스키마에 칸·표를 더하면 `db/postgres-schema.ts`에도 더한다(`tests/postgres-schema.test.mjs`가 확인). 운영 Turso·R2 데이터를 SQL·S3로 직접 수정·삭제하지 않는다(정리도 사용자 승인 필요).
