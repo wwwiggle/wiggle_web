@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { DRAWING_LOCKED } from "@/lib/feature-locks";
 import { activeProfile, flushSaves, studentFetch } from "@/lib/client-session";
 import { Logo } from "./Logo";
 import { DeskArtwork, StudentArtDesk } from "./StudentArtDesk";
@@ -40,7 +41,8 @@ export function StudentEntry() {
         const booksResponse = await studentFetch("/api/storybooks");
         const books = await booksResponse.json() as { storybooks?: unknown[]; error?: string };
         if (!booksResponse.ok) throw new Error(books.error ?? "그림책을 확인하지 못했어요.");
-        if (!books.storybooks?.length) { location.replace("/student/draw/new?mode=free"); return; }
+        // 그림 그리기가 잠겨 있으면(유료 요금제) 빈 도화지로 보내지 않고 그림 자리(그림책 만들기)를 보여 준다.
+        if (!books.storybooks?.length && !DRAWING_LOCKED) { location.replace("/student/draw/new?mode=free"); return; }
       }
       setData(payload);
       setBusy(false);

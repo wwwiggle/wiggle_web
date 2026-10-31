@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PaidLock } from "./PaidLock";
+import { DRAWING_LOCKED, DRAWING_LOCKED_MESSAGE, PAID_PLAN_LABEL } from "@/lib/feature-locks";
 import { deactivateProfile, studentFetch } from "@/lib/client-session";
 import { AuthenticatedImage, AuthenticatedImageCache } from "./AuthenticatedImage";
 import { Logo } from "./Logo";
@@ -31,7 +33,10 @@ const DRAWING = (artwork: DeskArtwork) => artwork.status !== "complete";
 /** 카드 한 장이 통째로 링크다. 안에 또 링크나 단추를 넣지 않는다(인계 지시 — 중첩 금지). */
 function ArtworkCard({ artwork }: { artwork: DeskArtwork }) {
   const drawing = DRAWING(artwork);
-  return <a className="desk-art-card" href={drawing ? `/student/draw/${encodeURIComponent(artwork.id)}` : `/student/archive/${encodeURIComponent(artwork.id)}`}>
+  // 그리다 만 그림은 그림판으로 이어지므로, 그림 그리기가 잠기면(유료 요금제) 카드를 누를 수 없게 둔다.
+  const locked = drawing && DRAWING_LOCKED;
+  const Card = locked ? "span" : "a";
+  return <Card className={`desk-art-card${locked ? " paid-lock" : ""}`} {...(locked ? { "aria-disabled": true, title: DRAWING_LOCKED_MESSAGE } : { href: drawing ? `/student/draw/${encodeURIComponent(artwork.id)}` : `/student/archive/${encodeURIComponent(artwork.id)}` })}>
     <span className="desk-art-paper">
       {artwork.hasImage
         ? <AuthenticatedImage className="desk-art-image" src={`/api/artworks/${encodeURIComponent(artwork.id)}/image`} alt={`${artwork.title} 그림`} lazy />
@@ -46,9 +51,9 @@ function ArtworkCard({ artwork }: { artwork: DeskArtwork }) {
       </span>
       {/* 시안대로 제목·날짜는 왼쪽, 행동은 같은 줄 오른쪽이다. 세로로 쌓으면 카드가 길어져
           한 줄에 네 장이 들어가지 않는다. */}
-      <span className="desk-art-go">{drawing ? "이어 그리기" : "그림 보기"} <span aria-hidden="true">›</span></span>
+      <span className="desk-art-go">{locked ? <>🔒 {PAID_PLAN_LABEL}</> : <>{drawing ? "이어 그리기" : "그림 보기"} <span aria-hidden="true">›</span></>}</span>
     </span>
-  </a>;
+  </Card>;
 }
 
 function BookCard({ book, index }: { book: DeskStorybook; index: number }) {
@@ -136,10 +141,15 @@ export function StudentArtDesk({ nickname, artworks, artworkTotal }: { nickname:
           <ul className="desk-art-row">
             {/* 모든 화면 크기에서 새 그림이 시각·탭 순서의 맨 앞이다. */}
             <li className="desk-new-item">
-              <a className="desk-new-card" href="/student/draw/new?mode=free">
-                <img src="/student-desk/icon-new-drawing.svg" alt="" aria-hidden="true" width={72} height={72} />
-                <b>새 그림 그리기</b>
-              </a>
+              {DRAWING_LOCKED
+                ? <PaidLock className="desk-new-card">
+                  <img src="/student-desk/icon-new-drawing.svg" alt="" aria-hidden="true" width={72} height={72} />
+                  <b>새 그림 그리기</b>
+                </PaidLock>
+                : <a className="desk-new-card" href="/student/draw/new?mode=free">
+                  <img src="/student-desk/icon-new-drawing.svg" alt="" aria-hidden="true" width={72} height={72} />
+                  <b>새 그림 그리기</b>
+                </a>}
             </li>
             {shown.map((artwork) => <li key={artwork.id}><ArtworkCard artwork={artwork} /></li>)}
           </ul>

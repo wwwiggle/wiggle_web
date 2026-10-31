@@ -117,3 +117,4 @@ body:has(.teacher-workspace){background:#fff}
 .tcw-entry-lock b{font-size:14px;font-weight:900;white-space:nowrap}
 .teacher-workspace .tcw-entry-lock button{min-height:36px;padding:0 12px;border:1px solid #dfb6a8;border-radius:999px;background:#fff;color:#8c4230;font-size:13px;font-weight:800;cursor:pointer}
 @media(max-width:760px){.tcw-entry-lock{margin-left:0;flex:1 1 100%;justify-content:space-between}}
+.teacher-workspace .tcw-artwork.paid-lock{flex-direction:column;align-items:center;justify-content:center;gap:4px}.tcw-paid-note{display:inline-flex;align-items:center;gap:8px;opacity:1}.tcw-paid-note .paid-lock-badge{margin-top:0}
