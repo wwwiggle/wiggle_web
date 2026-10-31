@@ -1,5 +1,14 @@
 # Wiggle Web 현재 상태
 
+## 2026-11-01 Vercel → Cloudflare 3단계 준비: Cloudflare용 빌드 (`claude/cloudflare-port`)
+
+- `npm run build:cloudflare`(OpenNext 1.20.12, wrangler 4.151.1)로 꿈틀 웹이 Cloudflare Worker로 빌드된다. 압축 2.88MB(무료 한도 3MB, 유료 10MB).
+- Workers에서 못 도는 네이티브 모듈: `next.config.ts`가 `WIGGLE_TARGET=cloudflare`일 때만 `lib/book-render.ts`(resvg·sharp)와 `db/adapters/turso-d1.ts`(libsql)를 `lib/cloudflare-stubs/`로 바꾼다(NormalModuleReplacementPlugin — `@/…` 별칭이 먼저 풀려 경로로 잡는다). 그림책 그리기는 `RENDER_SERVICE_URL`(그리기 서버), DB는 `DATABASE_URL`. 번들에 resvg·libsql 흔적 없음 확인. Vercel 빌드는 그대로.
+- `lib/security.ts` `requireTeacher`: 쿠키를 먼저 읽고 DB 준비를 한다. 전에는 DB 준비가 먼저라 빌드 때 `/admin` 같은 페이지를 미리 그리며 **빌드 환경에서 운영 DB에 접속**했다(Cloudflare 빌드는 DB가 없어 여기서 멈췄다). 동작은 같다.
+- `wrangler.jsonc`(Worker `wiggle-web`), `open-next.config.ts`, `@cloudflare/workers-types` 5로 올림(wrangler 요구). `.open-next`·`.wrangler`는 lint·git·tsconfig에서 뺐다.
+- 진행표 `docs/cloudflare-cutover.md`: 필요한 것(유료 요금제·Vercel 비밀 값·배포 권한), 순서, 되돌리기(DNS), 이사 전 DNS 기록.
+- 검증: Cloudflare 빌드 성공, Vercel 빌드 성공, typecheck, lint 오류 0(경고 14), Turso 464/464, Postgres 456/456. 실제 Worker 실행은 아직(비밀 값·요금제 필요).
+
 ## 2026-11-01 그리기 서버 자동 빌드·배포 (`claude/render-deploy`)
 
 - 사용자 결정: Docker를 개인 컴퓨터에 깔지 않고 GitHub Actions가 이미지를 만들어 Cloudflare Containers에 올린다(네 명 누가 합쳐도 같은 배포).

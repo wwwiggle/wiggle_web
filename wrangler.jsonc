@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // 꿈틀 웹을 Cloudflare Workers로 돌린다(2026-11-01, Vercel → Cloudflare 3단계). OpenNext가 Next 앱을 Worker로 바꾼다.
+  "name": "wiggle-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-16",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "vars": {
+    "WIGGLE_APP_ENV": "production",
+    "WIGGLE_DATA_ENV": "production"
+  }
+  // 비밀 값은 wrangler secret put으로: DATABASE_URL, R2_S3_*, GOOGLE_CLIENT_ID/SECRET, OPENAI_API_KEY, RENDER_SERVICE_URL/SECRET 등
+}

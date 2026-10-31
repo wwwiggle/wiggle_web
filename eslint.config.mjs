@@ -21,6 +21,10 @@ const eslintConfig = defineConfig([
     "outputs/**",
     "next-env.d.ts",
     "public/pdfjs/**",
+    // Cloudflare 빌드 결과물(npm run build:cloudflare)
+    ".open-next/**",
+    ".wrangler/**",
+    "render-service/cloudflare/**",
   ]),
 ]);
 
