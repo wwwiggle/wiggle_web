@@ -10,22 +10,12 @@ import { spineFontSizeMm } from "@/lib/storybook-structure";
 import type { BookFeedback, Rubric } from "@/lib/book-rubric";
 import { defaultFeedbackExport, feedbackExportContent, type FeedbackExportOptions } from "@/lib/feedback-export";
 import { fittedStoryText, STORY_TEXT_LINE_HEIGHT } from "@/lib/storybook-text";
+import { feedbackFilename, printPageCount, wrapText, type BookIdentity, type PrintCoverOptions, type PrintSize, type PrintSpec } from "@/lib/book-render-shared";
+
+export { downloadResponse, feedbackFilename, printPageCount, wrapText, type BookIdentity, type PrintCoverOptions, type PrintSize, type PrintSpec } from "@/lib/book-render-shared";
 
 export const FONT_PATH = `${process.cwd()}/public/fonts/NanumGothic-Regular.ttf`;
 const escape = (text: string) => text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-export function wrapText(text: string, width: number, measure: (s: string) => number) {
-  const lines: string[] = [];
-  for (const paragraph of text.replace(/\r/g, "").split("\n")) {
-    let line = "";
-    for (const char of paragraph) {
-      if (line && measure(line + char) > width) { lines.push(line); line = ""; }
-      line += char;
-    }
-    lines.push(line);
-  }
-  return lines;
-}
-
 // Uses the saved geometry, z-order, opacity, rotation and crop; never a text-only assessment.
 export async function renderBookPages(document: StorybookDocument, assets: Map<string, Buffer>, width = 1200) {
   const ratio = storybookAspectRatio(document.format);
@@ -58,15 +48,6 @@ export async function renderBookPages(document: StorybookDocument, assets: Map<s
     result.push(await sharp(png).jpeg({ quality: 92 }).toBuffer());
   }
   return result;
-}
-
-export type BookIdentity = { grade: number | null; classNumber: number | null; seatNumber: number | null; realName: string | null; title: string };
-export function feedbackFilename(identity: BookIdentity) {
-  const safe = (s: string) => s.normalize("NFC").replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_").replace(/[. ]+$/g, "").slice(0, 65) || "제목없음";
-  return `${identity.seatNumber ? identity.seatNumber + "_" : ""}${safe(identity.realName || "학생")}_${safe(identity.title)}_피드백.pdf`;
-}
-export function downloadResponse(bytes: Uint8Array, filename: string, contentType = "application/pdf") {
-  return new Response(new Uint8Array(bytes), { headers: { "content-type": contentType, "cache-control": "private, no-store", "content-disposition": `attachment; filename="download.pdf"; filename*=UTF-8''${encodeURIComponent(filename)}`, "x-content-type-options": "nosniff" } });
 }
 
 export async function feedbackPdf(identity: BookIdentity, rubric: Rubric, feedback: BookFeedback, version: string, options: FeedbackExportOptions = defaultFeedbackExport(rubric)) {
@@ -105,16 +86,7 @@ export async function feedbackPdf(identity: BookIdentity, rubric: Rubric, feedba
   return pdf.save();
 }
 
-export type PrintSize = { coverWidthMm: number; coverHeightMm: number; innerWidthMm: number; innerHeightMm: number; spineWidthMm: number };
-export type PrintSpec = { bookSpecUid: string; name: string; pageMin: number; pageMax: number; pageIncrement: number; bindingType: string; innerTrimWidthMm: number; innerTrimHeightMm: number; hingeGapMm?: number; caseWrapMarginMm?: number; bleedMm?: number };
-export function printPageCount(original: number, spec: PrintSpec) {
-  if (![spec.pageMin, spec.pageMax, spec.pageIncrement].every((n) => Number.isInteger(n) && n > 0) || spec.pageMax > 500) throw new Error("제작사의 페이지 규격을 확인하지 못했어요.");
-  const count = Math.ceil(Math.max(original, spec.pageMin) / spec.pageIncrement) * spec.pageIncrement;
-  if (count > spec.pageMax) throw new Error("선택한 판형의 최대 쪽 수를 넘었어요.");
-  return count;
-}
 /** Rendered page order: images[0] is the front cover; with backCover the last image is the back cover. */
-export type PrintCoverOptions = { backCover?: boolean; spine?: { title: string; author: string; publisher?: string } };
 export async function printPdfs(images: Buffer[], spec: PrintSpec, size: PrintSize, title: string, options: PrintCoverOptions = {}) {
   assertBookPrintSpec(spec);
   const backImage = options.backCover && images.length > 1 ? images[images.length - 1] : undefined;

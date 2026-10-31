@@ -29,10 +29,12 @@ after(async () => {
 });
 
 async function seedClass(DB, { id = "class_guard", code = "5101", seatCode = "1234" } = {}) {
+  // SQLite·Postgres 공통: 시각은 JS에서 만들고, 중복 무시는 ON CONFLICT로 쓴다(DB 이사 기간 두 DB에서 모두 돈다).
+  const now = new Date().toISOString();
   await DB.batch([
-    DB.prepare("INSERT OR IGNORE INTO teachers(id, email, display_name) VALUES ('teacher_guard', 'guard@example.com', 'Guard')"),
+    DB.prepare("INSERT INTO teachers(id, email, display_name) VALUES ('teacher_guard', 'guard@example.com', 'Guard') ON CONFLICT DO NOTHING"),
     DB.prepare("INSERT INTO classrooms(id, teacher_id, display_name, class_code, join_token) VALUES (?, 'teacher_guard', '지킴 반', ?, ?)").bind(id, code, `join_${id}`),
-    DB.prepare("INSERT INTO student_profiles(id, classroom_id, seat_number, real_name, entry_code, claimed_at, nickname, animal, last_activity_at) VALUES (?, ?, 1, '김민준', ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'), '용감한 토끼', '🐰', strftime('%Y-%m-%dT%H:%M:%fZ','now'))").bind(`student_${id}`, id, seatCode),
+    DB.prepare("INSERT INTO student_profiles(id, classroom_id, seat_number, real_name, entry_code, claimed_at, nickname, animal, last_activity_at) VALUES (?, ?, 1, '김민준', ?, ?, '용감한 토끼', '🐰', ?)").bind(`student_${id}`, id, seatCode, now, now),
   ]);
 }
 

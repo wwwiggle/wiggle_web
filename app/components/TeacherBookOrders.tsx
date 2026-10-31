@@ -4,7 +4,7 @@ import { Logo } from "./Logo";
 import { teacherRequest, postJson, jobLabel, type CompletedBook } from "./book-workflow-client";
 import { PrintDimensions, RequestHistory } from "./PrintRequestDetails";
 import { PRINT_LAYOUT_VERSION } from "@/lib/book-print-format";
-import type { PrintSpec } from "@/lib/book-render";
+import type { PrintSpec } from "@/lib/book-render-shared";
 import type { PrintLayout } from "@/lib/print-validation";
 import type { PrintRequest } from "@/lib/print-requests";
 import "./book-workflow.css";

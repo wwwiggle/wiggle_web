@@ -1,7 +1,8 @@
 import { bindings } from "@/db/runtime";
 import { jsonError, noStoreJson, requireTeacher } from "@/lib/security";
 import { workflowBook } from "@/lib/book-workflow";
-import { downloadResponse, feedbackFilename, feedbackPdf } from "@/lib/book-render";
+import { downloadResponse, feedbackFilename } from "@/lib/book-render-shared";
+import { bookFeedbackPdf } from "@/lib/book-render-service";
 import { parseFeedbackExport } from "@/lib/feedback-export";
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const teacher = await requireTeacher(); if (!teacher) return jsonError("교사 로그인이 필요해요.", 401);
@@ -12,6 +13,6 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (book.revision !== job.revision) return jsonError("그림책이 수정되었어요. 최신 완성본의 피드백을 다시 요청해 주세요.", 409);
   const rubric = JSON.parse(job.rubric_json), feedback = JSON.parse(job.feedback_json);
   if (new URL(request.url).searchParams.get("format") !== "pdf") return noStoreJson({ rubric, feedback, version: job.rubric_version, title: job.title });
-  try { return downloadResponse(await feedbackPdf({ ...book, title: job.title }, rubric, feedback, job.rubric_version, parseFeedbackExport(new URL(request.url).searchParams, rubric)), feedbackFilename({ ...book, title: job.title })); }
+  try { return downloadResponse(await bookFeedbackPdf({ ...book, title: job.title }, rubric, feedback, job.rubric_version, parseFeedbackExport(new URL(request.url).searchParams, rubric)), feedbackFilename({ ...book, title: job.title })); }
   catch (error) { return jsonError(error instanceof Error ? error.message : "PDF를 만들지 못했어요."); }
 }
