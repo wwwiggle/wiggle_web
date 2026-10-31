@@ -1,5 +1,17 @@
 # Wiggle Web 현재 상태
 
+## 2026-10-31 그림책 만들기 개편 — book_creator TODO 9개 반영 (검증·PR #36 제출 완료)
+
+- 출처: 사용자의 `qudcks1940/book_creator` `TODO.md`·`docs/cover-and-ebook.md`·`docs/privacy-school-info.md`. 결정·선택 원문은 `product-decisions.md` 「2026-10-31 그림책 만들기 개편」, 업체·법률 확인 항목은 `pending-decisions.md`.
+- 브랜치 `claude/book-creator-todo`(main `414203a`에서 생성). 구현 커밋 `585db94`를 `qudcks1940` 포크에 push하고 [PR #36](https://github.com/yonghwan86/wiggle_web/pull/36)을 제출했다(사용자 지시 "커밋·PR 올려줘"). 병합·배포 전이며 운영 DB/R2 변경 없음. 이 클론에는 `wwwiggle/new_wiggle` 원격이 없어 그쪽 동기화는 하지 않았다.
+- 구현
+  - 1·8번: `template: "back"`(뒷표지)·`"pattern"`(면지) 양식, 쪽 목록 이름표, 표지 앞뒤 고정, 「책 구성 갖추기」(빠진 면지·작가의 말·속표지·뒷표지만 추가), 속표지 제목·지은이 자동 채움, 「표지 펼쳐 보기」. 인쇄 표지 PDF에 뒷표지(왼쪽)·책등 글자(제목 + 앞표지 지은이) 추가, `PRINT_LAYOUT_VERSION` 3(준비된 옛 인쇄 PDF는 다시 준비).
+  - 2번: `storybook_ebook_links` 표, `/ebook/<토큰>` 보기(PC 펼침·좁은 화면 한 쪽, 넘김·키보드·스와이프·전체 화면), 작가·담임만 / 담임이 보호자 동의 기록 후 공유, 새 링크로 바꾸기, 완성 화면(ebook·링크 복사·PDF), 교사 목록에 ebook 보기와 만드는 중인 책 목록. `/ebook`·`/api/ebook`에 가족 공유와 같은 보안 헤더.
+  - 3·4번: 선생님 미리보기의 `window.print()`와 인쇄용 꼬리말(제목·별명·쪽수)을 제거하고 서버가 243 × 248mm PDF를 만든다(`viewPdf`, `/api/ebook/<토큰>/pdf`, 작가·담임만).
+  - 5번: 최소 24쪽 유지, 판형을 `BOOK_PRINT_PRODUCTS` 데이터로 전환. 6번: 패턴 면지 생성. 7번: 뒷표지 바코드·ISBN 자리 가이드(인쇄 안 됨). 9번: 학급 만들기·명단 설정에 학교 이름·학년(선택, 교사만).
+- 검증: production build, **437/437 테스트**(신규 `tests/book-structure.test.mjs`·`tests/storybook-ebook.test.mjs` 13개 포함), typecheck, lint 오류 0(기존 경고 14), `git diff --check` 통과. `next start -p 3299` 실제 브라우저에서 학급 생성(학교·학년)→학생 입장→25쪽 책 구성→표지 펼쳐 보기→패턴 면지→완성 화면→PDF(200, 2초)→ebook(1180×820 펼침 14보기, 390×844 한 쪽 25보기·뒷표지 마지막, 844×390, 320×568)→교사 공유 켜기→비로그인 보기(이름·학교 노출 없음, PDF 404, no-referrer·noindex) 확인. 그 과정에서 320×568 화살표·쪽수 겹침, 머리 단추 잘림, 표지 펼침 화면의 종이 최소 폭(290px) 넘침을 고쳤다.
+- 남은 위험: 실제 iPad Safari/Galaxy Tab 하드웨어, 운영 실측(`check-deployed`), 스위트북 sandbox 실제 표지 PDF 접수(책등 글자 위치) 미확인. PDF는 쪽 수가 많으면 서버 렌더 시간이 늘어난다(25쪽 약 2초, 함수 최대 120초). 로컬 `.data/`에 검증용 학급·책이 남아 있다(git 제외 경로).
+
 ## 2026-10-14 그림책 PDF 이미지 준비 게이트 (검증·PR #35 제출 완료)
 
 - 사용자 “그렇게 pr 날려” 승인에 따라 `codex/pdf-image-diagnosis-20261014`에서 작업하고, PR #34가 병합된 최신 `legacy-origin/main` `414203a`로 fast-forward했다.

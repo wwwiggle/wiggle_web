@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Logo } from "./Logo";
 import { teacherRequest, postJson, jobLabel, type CompletedBook } from "./book-workflow-client";
 import { PrintDimensions, RequestHistory } from "./PrintRequestDetails";
+import { PRINT_LAYOUT_VERSION } from "@/lib/book-print-format";
 import type { PrintSpec } from "@/lib/book-render";
 import type { PrintLayout } from "@/lib/print-validation";
 import type { PrintRequest } from "@/lib/print-requests";
@@ -28,7 +29,7 @@ export function TeacherBookOrders({ classroomId }: { classroomId: string }) {
     if (!initialized.current) { initialized.current = true; setSchool(r.profile?.school_name ?? ""); setGrade(String(r.room.grade ?? "")); setClassNumber(String(r.room.classNumber ?? "")); }
   }, [classroomId]);
   useEffect(() => { void load().catch((e) => setError(e.message)); }, [load]);
-  const currentJob = (book: CompletedBook) => state?.jobs.find((j) => j.storybookId === book.id && j.revision === book.revision && j.specUid === specUid && (j.status !== "ready" || (j.layoutJson && JSON.parse(j.layoutJson).sourceLayoutVersion === 2)));
+  const currentJob = (book: CompletedBook) => state?.jobs.find((j) => j.storybookId === book.id && j.revision === book.revision && j.specUid === specUid && (j.status !== "ready" || (j.layoutJson && JSON.parse(j.layoutJson).sourceLayoutVersion === PRINT_LAYOUT_VERSION)));
   const selectedBooks = books.filter((b) => selected.includes(b.id));
   const ready = selected.length + selectedUploads.length > 0 && selected.length + selectedUploads.length <= 50 && selectedBooks.every((b) => currentJob(b)?.status === "ready");
   function changed() { setConfirmed(false); requestId.current = null; }

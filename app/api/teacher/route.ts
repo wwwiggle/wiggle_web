@@ -1,4 +1,5 @@
 import { isAdmin } from "@/lib/admin";
+import { classroomProfileInput, type ClassroomProfile } from "@/lib/classroom-profile";
 import { cookies } from "next/headers";
 import { bindings, randomEntryCode } from "@/db/runtime";
 import { bytesToDataUrl } from "@/lib/image-data";
@@ -187,7 +188,8 @@ export async function GET(request: Request) {
   const lockedRow = await db.prepare(`SELECT COUNT(*) AS n FROM entry_lockouts WHERE classroom_id = ? AND locked_until > ?`).bind(classroomId, new Date().toISOString()).first<{ n: number }>();
   // serverNow: 손든 뒤 얼마나 기다렸는지를 교사 화면이 서버 시계 기준으로 계산하게 한다.
   // 교사 기기 시계가 틀어져 있어도 "3분째"가 어긋나지 않는다.
-  return noStoreJson({ teacher: { ...teacher, isAdmin: isAdmin(teacher) }, classroom, students: hydrated, archivedStudents: archivedStudents.results, messages: messages.results, familyLinks: familyLinks.results, entryLocks: lockedRow?.n ?? 0, serverNow: new Date().toISOString() });
+  const profileRow = await db.prepare(`SELECT p.school_name AS schoolName, b.grade FROM classrooms c LEFT JOIN classroom_profiles p ON p.classroom_id = c.id LEFT JOIN classroom_book_settings b ON b.classroom_id = c.id WHERE c.id = ?`).bind(classroomId).first<{ schoolName: string | null; grade: number | null }>();
+  return noStoreJson({ teacher: { ...teacher, isAdmin: isAdmin(teacher) }, classroom, profile: { schoolName: profileRow?.schoolName ?? "", grade: profileRow?.grade ?? null }, students: hydrated, archivedStudents: archivedStudents.results, messages: messages.results, familyLinks: familyLinks.results, entryLocks: lockedRow?.n ?? 0, serverNow: new Date().toISOString() });
 }
 
 /* 교사가 입력하는 학급 명단. 번호는 학급 안에서 고유하고, 실명은 담임에게만 보인다.
@@ -218,6 +220,15 @@ function parseRoster(value: unknown): { entries: RosterEntry[] } | { error: stri
     entries.push({ seatNumber, realName });
   }
   return { entries };
+}
+
+/** Writes (or, when updating, clears) the optional school name and grade. */
+function classroomProfileStatements(db: ReturnType<typeof bindings>["DB"], classroomId: string, profile: ClassroomProfile, update = false) {
+  const statements = [];
+  if (profile.schoolName) statements.push(db.prepare(`INSERT INTO classroom_profiles(classroom_id, school_name) VALUES (?, ?) ON CONFLICT(classroom_id) DO UPDATE SET school_name = excluded.school_name`).bind(classroomId, profile.schoolName));
+  else if (update) statements.push(db.prepare(`DELETE FROM classroom_profiles WHERE classroom_id = ?`).bind(classroomId));
+  if (profile.grade !== null || update) statements.push(db.prepare(`INSERT INTO classroom_book_settings(classroom_id, grade) VALUES (?, ?) ON CONFLICT(classroom_id) DO UPDATE SET grade = excluded.grade, updated_at = CURRENT_TIMESTAMP`).bind(classroomId, profile.grade));
+  return statements;
 }
 
 function insertRosterRow(db: ReturnType<typeof bindings>["DB"], classroomId: string, entry: RosterEntry, entryCode: string) {
@@ -274,11 +285,16 @@ export async function POST(request: Request) {
     const parsedRoster = parseRoster(payload.roster);
     if ("error" in parsedRoster) return jsonError(parsedRoster.error);
     const roster = parsedRoster.entries;
+    // 학교·학년은 선생님(성인)이 학급을 만들 때 한 번만 받는다(선택 항목). 학생은 입력하지 않고,
+    // 학생 화면·ebook·AI 요청에는 싣지 않는다 — 인쇄 주문서 자동 채움과 수업 관리용이다(2026-10-31).
+    const profile = classroomProfileInput(payload);
+    if ("error" in profile) return jsonError(profile.error);
     const classroom = { id: id("class"), classCode: await uniqueClassCode(), joinToken: randomToken(18) };
     const codes = await freshEntryCodes(db, classroom.id, roster.length);
     await db.batch([
       db.prepare(`INSERT INTO classrooms(id, teacher_id, display_name, class_code, join_token, admission_open, active, current_activity) VALUES (?, ?, ?, ?, ?, 1, 1, ?)`).bind(classroom.id, teacher.id, displayName, classroom.classCode, classroom.joinToken, DEFAULT_ACTIVITY_KEY),
       ...roster.map((entry, index) => insertRosterRow(db, classroom.id, entry, codes[index])),
+      ...classroomProfileStatements(db, classroom.id, profile),
     ]);
     // 참여 코드는 교사 화면(명단·코드표)에서만 본다. 학생 응답에는 절대 싣지 않는다.
     return noStoreJson({ classroom, rosterSize: roster.length, entryCodes: roster.map((entry, index) => ({ seatNumber: entry.seatNumber, entryCode: codes[index] })) }, { status: 201 });
@@ -310,6 +326,12 @@ export async function POST(request: Request) {
     const codes = await freshEntryCodes(db, classroomId, parsed.entries.length);
     await db.batch(parsed.entries.map((entry, index) => insertRosterRow(db, classroomId, entry, codes[index])));
     return noStoreJson({ added: parsed.entries.length }, { status: 201 });
+  }
+  if (action === "updateClassroomProfile") {
+    const profile = classroomProfileInput(payload);
+    if ("error" in profile) return jsonError(profile.error);
+    await db.batch(classroomProfileStatements(db, classroomId, profile, true));
+    return noStoreJson({ ok: true, profile });
   }
   if (action === "updateStudent") {
     const studentId = cleanText(payload.studentId, 40);

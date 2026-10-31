@@ -68,8 +68,11 @@ test("교사 완성 그림책 화면은 소유권·완성 상태·개별 및 일
   assert.match(generation, /전체 선택/);
   assert.match(generation, /선택한 책 피드백 만들기/);
   assert.match(await read("../app/components/TeacherFeedbackManager.tsx"), /<TeacherFeedbackGeneration/);
-  assert.match(preview, /window\.print\(\)/);
-  assert.match(preview, /PDF로 저장 · 인쇄/);
+  // 2026-10-31: 브라우저 인쇄(A4, 머리글·바닥글·쪽 번호)를 버리고 서버가 만든 정사각형 PDF를 내려받는다.
+  assert.doesNotMatch(preview, /window\.print\(\)/);
+  assert.doesNotMatch(preview, /teacher-print-pages/);
+  assert.match(preview, /downloadEbookPdf/);
+  assert.match(preview, /ebook으로 보기/);
   assert.match(teacherApp, /TeacherWorkspace/);
   assert.match(await read("../app/components/TeacherWorkArchive.tsx"), /완성 그림책/);
 });

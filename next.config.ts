@@ -42,6 +42,9 @@ const nextConfig: NextConfig = {
       { source: "/:path+", headers: frameDenyHeaders },
       { source: "/family/:path*", headers: familyHeaders },
       { source: "/api/family/:path*", headers: familyHeaders },
+      // ebook 링크: 토큰이 주소에 있으므로 리퍼러·캐시·검색 노출을 막는다(가족 공유와 같은 강화 세트).
+      { source: "/ebook/:path*", headers: familyHeaders },
+      { source: "/api/ebook/:path*", headers: familyHeaders },
     ];
   },
 };

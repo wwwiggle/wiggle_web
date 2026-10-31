@@ -56,7 +56,9 @@ export async function GET(request: Request) {
     const document = readDocument(documentJson);
     return document ? [{ ...book, ...coverSummary(document) }] : [];
   });
-  return noStoreJson({ classroom, storybooks });
+  // Books still being made: listed with status so the teacher can open each one as an ebook.
+  const drafts = await bindings().DB.prepare(`SELECT b.id, b.title, b.student_id AS studentId, s.seat_number AS seatNumber, s.real_name AS realName, s.nickname, s.animal, b.updated_at AS updatedAt, json_array_length(b.document_json, '$.pages') AS pageCount FROM storybooks b JOIN student_profiles s ON s.id = b.student_id WHERE b.classroom_id = ? AND s.archived_at IS NULL AND b.status = 'draft' ORDER BY b.updated_at DESC, b.id DESC LIMIT 200`).bind(classroomId).all<{ id: string; title: string; studentId: string; seatNumber: number | null; realName: string | null; nickname: string; animal: string; updatedAt: string; pageCount: number | null }>();
+  return noStoreJson({ classroom, storybooks, drafts: drafts.results });
 }
 
 export async function POST(request: Request) {
