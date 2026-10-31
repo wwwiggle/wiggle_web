@@ -2,7 +2,7 @@ import { bindings } from "@/db/runtime";
 import { isAdmin } from "@/lib/admin";
 import { requireTeacher, jsonError, noStoreJson } from "@/lib/security";
 import { readPrintFile, type PrintRequest, type RequestDocument } from "@/lib/print-requests";
-import { downloadResponse } from "@/lib/book-render";
+import { downloadResponse } from "@/lib/book-render-shared";
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const teacher = await requireTeacher(); if (!teacher) return jsonError("로그인이 필요해요.", 401);
   const row = await bindings().DB.prepare(`SELECT * FROM print_requests WHERE id = ?`).bind((await context.params).id).first<PrintRequest>();

@@ -4,7 +4,7 @@ import { cleanText, jsonError, noStoreJson, requireTeacher, sameOrigin, rateLimi
 import { bookClassroom, selectedBookIds } from "@/lib/book-workflow";
 import { enqueuePrint } from "@/lib/book-print-workflow";
 import { printConfigured, printEnvironment, sweetbook } from "@/lib/sweetbook";
-import type { PrintSpec } from "@/lib/book-render";
+import type { PrintSpec } from "@/lib/book-render-shared";
 
 export const maxDuration = 120;
 export async function GET(request: Request) {

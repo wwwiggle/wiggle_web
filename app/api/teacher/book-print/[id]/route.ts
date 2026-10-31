@@ -2,7 +2,7 @@ import { bindings } from "@/db/runtime";
 import { jsonError, requireTeacher } from "@/lib/security";
 import { workflowBook } from "@/lib/book-workflow";
 import { printObjectKey, type PrintJob } from "@/lib/book-print-workflow";
-import { downloadResponse } from "@/lib/book-render";
+import { downloadResponse } from "@/lib/book-render-shared";
 import { PRINT_LAYOUT_VERSION } from "@/lib/book-print-format";
 import { printEnvironment } from "@/lib/sweetbook";
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {

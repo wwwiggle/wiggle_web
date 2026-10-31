@@ -1,5 +1,22 @@
 # Wiggle Web 현재 상태
 
+## 2026-11-01 DB 이사 리허설: 운영 Turso → 개발 Supabase
+
+- 운영 Turso(`wiggle-yonghwan86`)를 읽기만 해서 개발 Supabase `web`에 복사(`scripts/migrate-turso-to-postgres.mjs --truncate-target`). 44표·약 2만 2천 행, 복사 10초·전체 22초.
+- 42표는 행 수·내용 해시가 같았다. 다른 2표(`teacher_sessions` 1행의 `last_used_at`, `rate_limits` 1행의 `count`)는 복사하는 사이 운영이 바꾼 값이었다 — 칸 단위로 비교해 확인. 이사 당일에는 점검 모드로 쓰기를 멈춘 뒤 복사해야 한다.
+- 확인 뒤 개발 Supabase `web`의 운영 복사본(학생 실명 포함)을 모두 지웠다(44표 0행).
+- ⚠️ 받은 Turso 토큰이 읽기 전용이 아니라 `rw`이고 채팅에 노출됐다. 맥 `.env.local`에 `# vercel-only:` 주석으로만 둔다. 하나만 끊을 수 없어(전체 무효화는 운영 Vercel 토큰도 끊음) **이사 당일 Turso를 안 쓰게 된 뒤 `turso db tokens invalidate`로 정리**한다.
+
+## 2026-11-01 Cloudflare 이사 2단계: 그림책 그리기 서버 분리 (`claude/render-service`, 로컬 검증)
+
+- 이유: Cloudflare Workers에서는 `resvg`·`sharp`(그림책 쪽 그리기·인쇄 이미지 다듬기)가 돌지 않는다. 책 한 권 그림이 최대 80MB라 Worker 메모리(128MB)로 모으는 것도 위험하다. 사용자 선택 "C": 지금 코드를 그대로 쓰는 그리기 서버를 Cloudflare Containers에 둔다.
+- `lib/book-render-shared.ts`: 타입·쪽 수 계산·다운로드 응답 등 가벼운 부분을 떼어 냈다. 웹 서버 코드는 이것만 불러 무거운 모듈이 번들에 들어오지 않는다. `lib/book-render.ts`는 그대로 다시 내보낸다(기존 테스트 호환).
+- `lib/book-render-service.ts`: `RENDER_SERVICE_URL`이 없으면(지금 Vercel·로컬·테스트) 직접 그리고, 있으면 그리기 서버에 맡긴다. 무거운 모듈은 직접 그릴 때만 동적으로 불러온다. 호출부 4곳(AI 피드백 쪽 그림, ebook PDF, 인쇄 PDF, 피드백 PDF)을 이 길로 바꿨다. `bookRenderSource`가 그림 소유·용량(80MB) 확인과 저장소 키만 넘긴다.
+- `render-service/`: Node HTTP 서버(`/pages`, `/view-pdf`, `/print-pdfs`, `/feedback-pdf`, `/health`), `x-render-secret` 확인, 그림은 R2(S3 API)에서 직접 읽는다(앱과 같은 `createArtworksStore` 환경 경계). Dockerfile(node 22.23.2 bookworm-slim). 이 맥에 Docker가 없어 **이미지 빌드는 아직 못 했다**.
+- 검증: `tests/render-service.test.mjs` — 서버를 거친 쪽 JPEG가 직접 그린 것과 **바이트까지 같음**, 화면·인쇄·피드백 PDF 쪽 수·크기 같음, 비밀 틀림·그림 누락·크기 오류 거절. 서버 단독 실행(`/health`, 비밀 없는 요청 401) 확인. typecheck, lint 오류 0(경고 14), production build, **Turso 461/461**, **Postgres 451/451 + 건너뜀 1**.
+- 함께 고침: PR #38 테스트(`entry-failure-limit`) 준비 코드의 `INSERT OR IGNORE`·`strftime`이 Postgres에서 깨져 두 DB 공통 문법으로 바꿨다. 다시 생기지 않게 `tests/postgres-schema.test.mjs`에 "SQLite 전용 문법 금지" 검사를 더했다(옛 Turso 업그레이드 등 예외 파일만 허용).
+- 남은 일: Docker로 이미지 빌드·실행 확인, Cloudflare Containers 배포(유료 요금제 필요), 3단계에서 Worker와 연결.
+
 ## 2026-11-01 `preview/supabase` 미리보기 준비 (Vercel 설정, 비밀값 제외)
 
 - 사용자가 받은 팀 안내문(GitHub 웹으로 main 배포 → `preview/supabase` 브랜치 → Preview에 `DATABASE_URL`)을 오늘 상태와 대조했다. main 배포 단계는 Git 재연결로 필요 없어졌고("용환님 이름 커밋이라야 배포" 설명은 틀린 진단), 미리보기 단계는 그대로면 막힌다.

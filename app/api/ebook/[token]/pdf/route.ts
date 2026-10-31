@@ -1,4 +1,4 @@
-import { downloadResponse } from "@/lib/book-render";
+import { downloadResponse } from "@/lib/book-render-shared";
 import { jsonError, rateLimit } from "@/lib/security";
 import { ebookAccess, ebookPdf, ebookPdfFilename } from "@/lib/storybook-ebook";
 

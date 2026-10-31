@@ -2,7 +2,7 @@
 // https://api.sweetbook.com/docs/concepts/pdf-size/
 // Products are data so another binding (e.g. SQUAREBOOK_LAYFLAT_HC, 16–46 pages) can be added once its
 // PDF geometry and pricing are confirmed with the vendor. Until then only the hardcover square book is offered.
-import type { PrintSize, PrintSpec } from "@/lib/book-render";
+import type { PrintSize, PrintSpec } from "@/lib/book-render-shared";
 
 /** Bumped when the cover/inner split changes so stale prepared PDFs are rebuilt (3 = back cover + spine text). */
 export const PRINT_LAYOUT_VERSION = 3;

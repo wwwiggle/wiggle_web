@@ -56,3 +56,24 @@ test("SQL 변환은 문자열 안을 건드리지 않고 SQLite 습관을 Postgr
   assert.equal(toPostgresSql("SELECT json_array_length(b.doc, '$.pages') AS pageCount"), `SELECT json_array_length(CAST(b.doc AS json)->'pages') AS "pageCount"`);
   assert.match(toPostgresSql("WHERE updated_at < datetime('now','-5 minutes')"), /interval '5 minutes'/);
 });
+
+// DB 이사 기간에는 앱과 테스트가 두 DB에서 모두 돌아야 한다. SQLite에만 있는 문법을 새로 쓰면 Postgres에서만 깨진다
+// (2026-11-01 PR #38 테스트 준비 코드가 그랬다). 두 DB 공통으로 쓰는 법:
+// INSERT OR IGNORE → INSERT … ON CONFLICT DO NOTHING, strftime(…'now') → JS new Date().toISOString() 바인딩, COLLATE NOCASE → lower().
+test("앱·테스트 코드에 SQLite 전용 문법을 새로 쓰지 않는다", async () => {
+  const { readdir, readFile } = await import("node:fs/promises");
+  // SQLite 전용 경로를 일부러 다루는 파일만 예외: 옛 Turso 스키마 업그레이드, Turso 어댑터 시험, 옛 마이그레이션 원문을 확인하는 보안 회귀 시험.
+  const allowed = new Set(["db/runtime.ts", "tests/turso-adapters.test.mjs", "tests/security-regressions.test.mjs", "tests/postgres-schema.test.mjs"]);
+  const offenders = [];
+  async function walk(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const file = `${directory}/${entry.name}`;
+      if (entry.isDirectory()) { if (entry.name !== "node_modules") await walk(file); continue; }
+      if (!/\.(ts|tsx|mjs)$/.test(entry.name) || allowed.has(file)) continue;
+      const text = await readFile(file, "utf8");
+      if (/INSERT OR (IGNORE|REPLACE)|strftime\(|COLLATE NOCASE/.test(text)) offenders.push(file);
+    }
+  }
+  for (const directory of ["app", "lib", "db", "tests"]) await walk(directory);
+  assert.deepEqual(offenders, []);
+});
