@@ -72,7 +72,9 @@ test("잠금 단위는 IP가 아니라 기기다", async () => {
     read("../lib/student-entry-client.ts"),
   ]);
   // 기기 키로 세고, 기기 키로 잠근다.
-  assert.match(route, /const deviceKey = normalizeDeviceKey\(payload\.deviceKey\);/);
+  assert.match(route, /const deviceKey = await entryDeviceKey\(request, payload\.deviceKey\);/);
+  // 식별값을 빼고 보내도 잠금을 피하지 못하게, 없으면 IP에서 만든 키로 센다(2026-10-31).
+  assert.match(route, /return normalizeDeviceKey\(value\) \|\| `ip-\$\{\(await sha256\(requestIp\(request\)\)\)\.slice\(0, 40\)\}`;/);
   assert.match(route, /FROM entry_lockouts WHERE device_key = \?/);
   // 브라우저가 스스로 만들어 보관한다. 저장소를 못 쓰면 입장 자체를 막지는 않는다.
   assert.match(client, /export function entryDeviceKey/);

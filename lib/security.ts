@@ -3,7 +3,7 @@ import { pbkdf2 } from "node:crypto";
 import { cookies } from "next/headers";
 import { bindings, ensureSchema } from "@/db/runtime";
 import { id, sha256 } from "@/lib/token-crypto";
-import { consumeRateLimit, releaseRateLimit } from "@/lib/rate-limit";
+import { consumeRateLimit, rateLimitReached as reachedRateLimit, releaseRateLimit } from "@/lib/rate-limit";
 import { isLocalDevelopmentRequest } from "@/lib/runtime/environment";
 
 export { id, randomToken, sha256 } from "@/lib/token-crypto";
@@ -117,6 +117,11 @@ export { clientIp } from "./client-ip.ts";
 export async function rateLimit(key: string, max: number, seconds: number) {
   await ensureSchema();
   return consumeRateLimit(bindings().DB, key, max, seconds);
+}
+
+export async function rateLimitReached(key: string, max: number) {
+  await ensureSchema();
+  return reachedRateLimit(bindings().DB, key, max);
 }
 
 export async function clearRateLimit(key: string) {

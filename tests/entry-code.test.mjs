@@ -80,7 +80,8 @@ test("틀린 코드는 404로만 답하고 명단을 알려 주지 않으며, �
 
   const wrong = await server.fetch("/api/student", studentRequest({ action: "join", entry: "4321", entryCode: "9999", animal: "🐰" }, "203.0.113.170"));
   assert.equal(wrong.status, 404);
-  assert.deepEqual(await wrong.json(), { error: "참여 코드를 다시 확인해 주세요.", code: "ENTRY_CODE" });
+  // 기기 식별값이 없어도 IP로 만든 키로 기기 잠금을 센다(2026-10-31) — 남은 횟수를 함께 알려 준다.
+  assert.deepEqual(await wrong.json(), { error: "참여 코드를 다시 확인해 주세요.", code: "ENTRY_CODE", attemptsLeft: 4 });
 
   const short = await server.fetch("/api/student", studentRequest({ action: "join", entry: "4321", entryCode: "33" }, "203.0.113.171"));
   assert.equal(short.status, 400);

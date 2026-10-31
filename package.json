@@ -30,14 +30,14 @@
     "fflate": "^0.8.3",
     "jsqr": "^1.4.0",
     "lucide-react": "^1.43.0",
-    "next": "16.3.3",
+    "next": "16.4.2",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.3.289",
     "qrcode": "^1.5.4",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "react-moveable": "0.56.0",
-    "sharp": "^0.35.4"
+    "sharp": "^0.35.5"
   },
   "overrides": {
     "ws": "8.21.1"
@@ -52,7 +52,7 @@
     "drizzle-kit": "0.31.10",
     "drizzle-orm": "0.45.2",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.3.3",
+    "eslint-config-next": "16.4.2",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3"
   }

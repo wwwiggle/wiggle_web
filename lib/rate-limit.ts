@@ -22,6 +22,13 @@ export async function consumeRateLimit(DB: D1Database, key: string, max: number,
   return count <= max;
 }
 
+// 틀린 시도만 세는 버킷용: 올리지 않고 이미 상한에 닿았는지만 본다. 상한에 닿은 뒤에는
+// 맞는 코드도 확인해 주지 않아야 하므로, 코드를 대조하기 전에 이것으로 먼저 막는다.
+export async function rateLimitReached(DB: D1Database, key: string, max: number, now = new Date()) {
+  const row = await DB.prepare(`SELECT count FROM rate_limits WHERE key = ? AND window_ends_at > ?`).bind(key, now.toISOString()).first<{ count: number }>();
+  return (row?.count ?? 0) >= max;
+}
+
 // 성공한 인증은 시도 카운터를 비운다. 대상 단위 한도가 무차별 대입만 막고
 // 같은 태블릿을 정상적으로 여러 번 여는 아이를 잠그지 않게 한다.
 export async function releaseRateLimit(DB: D1Database, key: string) {
