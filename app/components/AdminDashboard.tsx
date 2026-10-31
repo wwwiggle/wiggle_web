@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Logo } from "./Logo";
 import { teacherRequest, postJson } from "./book-workflow-client";
 import { RequestDetails, requestStatus } from "./PrintRequestDetails";
+import { AdminBookOrders } from "./AdminBookOrders";
+import "./book-order.css";
 import type { PrintRequest, RequestDocument, ProviderState } from "@/lib/print-requests";
 import "./book-workflow.css";
 type Dashboard = {
@@ -16,7 +18,7 @@ type Dashboard = {
 const mb = (bytes: number) => `${Math.round(bytes / 1024 / 1024).toLocaleString()} MB`;
 export function AdminDashboard({ name }: { name: string }) {
   const [data, setData] = useState<Dashboard | null>(null), [error, setError] = useState(""), [busy, setBusy] = useState("");
-  const [tab, setTab] = useState("orders"), [selected, setSelected] = useState(""), [confirmed, setConfirmed] = useState(false), [maximum, setMaximum] = useState(""), [basis, setBasis] = useState("");
+  const [tab, setTab] = useState("bookOrders"), [selected, setSelected] = useState(""), [confirmed, setConfirmed] = useState(false), [maximum, setMaximum] = useState(""), [basis, setBasis] = useState("");
   const [detail, setDetail] = useState<PrintRequest | null>(null);
   const load = useCallback(async () => { const value = await teacherRequest<Dashboard>("/api/admin"); setData(value); if (selected) setDetail(await teacherRequest<PrintRequest>(`/api/print-requests/${selected}?kind=detail`)); }, [selected]);
   useEffect(() => { const refresh = () => { if (document.visibilityState === "visible") void load().catch((e) => setError(e.message)); }; refresh(); const timer = setInterval(refresh, 10_000); return () => clearInterval(timer); }, [load]);
@@ -27,7 +29,8 @@ export function AdminDashboard({ name }: { name: string }) {
   return <main className="book-desk admin-desk"><header className="book-desk-header"><Logo /><span>운영 관리 · {name}</span><a className="small-button" href="/teacher">교사 화면</a></header><section className="admin-heading"><p className="eyebrow">WIGGLE OPERATIONS</p><h1>교실에서 책이 되기까지</h1><p>가입과 수업 현황, 제작 요청을 한곳에서 확인합니다.</p></section>
     {error && <p className="error-box" role="alert">{error}</p>}
     <div className="admin-metrics"><article><span>가입 교사</span><strong>{data?.teachers.length ?? "—"}</strong></article><article><span>열린 학급</span><strong>{data?.classrooms.filter((c) => c.active).length ?? "—"}</strong></article><article><span>현재 접속 / 운영 최대 인원</span><strong>{online} / {data?.capacity?.maximum ?? "미설정"}</strong><small>학생 {data?.participants.length ?? 0} · 교사 {onlineTeachers}</small></article><article><span>추가 수용 여유</span><strong>{remaining === null ? "산정 전" : `${remaining}명`}</strong><small>{data?.capacity ? "운영 설정 기준 · 입장 제한은 아님" : "부하 테스트 후 최대 인원을 설정하세요"}</small></article></div>
-    <nav className="book-toolbar" aria-label="관리 영역">{[["orders", "제작 요청"], ["classes", "교사 · 학급 · 참여자"], ["resources", "서버 · 수용 인원"]].map(([key, label]) => <button key={key} className={`button ${tab === key ? "primary" : "secondary"}`} aria-pressed={tab === key} onClick={() => setTab(key)}>{label}</button>)}</nav>
+    <nav className="book-toolbar" aria-label="관리 영역">{[["bookOrders", "그림책 주문 · 입금"], ["orders", "제작 요청 (원고 PDF)"], ["classes", "교사 · 학급 · 참여자"], ["resources", "서버 · 수용 인원"]].map(([key, label]) => <button key={key} className={`button ${tab === key ? "primary" : "secondary"}`} aria-pressed={tab === key} onClick={() => setTab(key)}>{label}</button>)}</nav>
+    {tab === "bookOrders" && <AdminBookOrders />}
     {tab === "orders" && <div className="admin-orders"><section className="book-panel"><h2>제작 요청함</h2><p>접수한 파일을 확인하고 견적을 조회한 뒤 발주하세요. 최근 200건을 표시합니다.</p>{data?.orders.map((r) => { const doc: RequestDocument = JSON.parse(r.document_json); return <button className={`admin-request-card ${selected === r.id ? "selected" : ""}`} key={r.id} onClick={() => { setSelected(r.id); setConfirmed(false); }}><b>{doc.classroom.school} {doc.classroom.grade}학년 {doc.classroom.classNumber}반</b><span>{doc.teacher.name} · {doc.items.length}종 / {doc.items.reduce((n, i) => n + i.quantity, 0)}권</span><span>{requestStatus(r.status)}</span><small>{r.created_at} · {r.environment}</small></button>; })}{!data?.orders.length && <p className="book-empty">교사가 제출한 주문 요청서가 여기에 도착합니다.</p>}</section>
       <section className="book-panel"><h2>원고와 주문 요청서</h2>{order ? <><RequestDetails request={order} />{!["submitted", "submitting", "uncertain"].includes(order.status) && <button className="button secondary" disabled={!!busy} onClick={() => void action(order.id, async () => { setConfirmed(false); for (;;) { const r = await teacherRequest<{ done: boolean }>("/api/admin/print-requests", postJson({ id: order.id, action: "prepare" })); await load(); if (r.done) break; } })}>{busy === order.id ? "책별 원고 전송 중…" : "제작사에 원고 준비 · 견적 조회"}</button>}
       {provider.estimate && <div className="book-quote"><h3>제작사 충전금 차감 예정액</h3><strong>{provider.estimate.paidCreditAmount.toLocaleString()}원</strong><p>잔액 {provider.estimate.creditBalance.toLocaleString()}원 · {provider.estimate.creditSufficient ? "발주 가능" : "충전 필요"}</p><p>견적은 10분간 유효합니다. 실제 발주 직전 금액과 잔액을 다시 확인합니다.</p></div>}

@@ -236,7 +236,7 @@ test("the UI source keeps completion, archive, palette, help-choice and touch pr
      종전에는 그리다 만 그림을 **자동으로** 열었다 — 그러면 아이가 새 그림을 시작할 길이 없었다.
      이제 이어 그리기는 목록에서 아이가 직접 고른다. */
   // A teacher-imported PDF also counts as an existing work: keep its home/library reachable.
-  assert.match(studentEntry, /if \(!books\.storybooks\?\.length\) \{ location\.replace\("\/student\/draw\/new\?mode=free"\); return; \}/);
+  assert.match(studentEntry, /if \(!books\.storybooks\?\.length && !DRAWING_LOCKED\) \{ location\.replace\("\/student\/draw\/new\?mode=free"\); return; \}/);
   assert.match(studentEntry, /if \(data\) return <StudentArtDesk /);
   assert.doesNotMatch(studentEntry, /latestUnfinishedArtwork/, "그리던 그림을 자동으로 열면 안 된다");
   assert.match(archive, /setHasMore\(Boolean\(value\.artworkHasMore\)\)/);
