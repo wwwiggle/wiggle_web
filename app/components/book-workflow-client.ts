@@ -21,4 +21,5 @@ export async function downloadFeedback(id: string, options?: import("@/lib/feedb
   return { bytes: new Uint8Array(await response.arrayBuffer()), filename };
 }
 export type CompletedBook = { id: string; title: string; studentId: string; nickname: string; animal: string; seatNumber: number | null; realName: string | null; revision: number; pageCount: number; completedAt: string; cover: { background: string; imageAssetId: string | null; backgroundAssetId: string | null; text: string } };
+export type DraftBook = { id: string; title: string; studentId: string; seatNumber: number | null; realName: string | null; nickname: string; animal: string; updatedAt: string; pageCount: number | null };
 export const jobLabel = (status?: string) => ({ queued: "대기 중", waiting_key: "API 키 대기", processing: "만드는 중", failed: "재시도 필요", complete: "피드백 완료", ready: "주문 준비 완료", draft: "견적 저장", submitted: "주문 접수", submitting: "전송 중", uncertain: "전송 결과 확인 필요" }[status ?? ""] ?? "아직 요청 안 함");

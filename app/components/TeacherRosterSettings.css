@@ -23,3 +23,12 @@
 /* 320px에서는 두 자리 번호에 88px을 주면 이름 칸이 84px만 남는다 — 좁은 화면에서만 번호 칸을 줄인다.
    편집기가 설정 화면과 학급 만들기 폼 양쪽에 있으므로 여기 한 곳에서 고친다(2026-09-23). */
 @media(max-width:420px){.trs-rows-head,.trs-row{grid-template-columns:56px minmax(0,1fr) 44px}}
+.trs-school { display:grid; gap:10px; margin-top:20px; }
+.trs-school h3 { margin:0; }
+.trs-school h3 small, .create-class-school small { font-weight:400; color:#68716c; }
+.trs-school p { margin:0; font-size:14px; line-height:1.6; color:#68716c; }
+.trs-school label, .create-class-school label { display:grid; gap:6px; font-weight:700; }
+.trs-school input, .trs-school select, .create-class-school input, .create-class-school select { min-height:44px; width:100%; border:1px solid #dce1de; border-radius:10px; padding:0 12px; font:inherit; background:#fff; }
+.create-class-school { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:12px; align-items:end; }
+.create-class-school .roster-privacy { grid-column:1 / -1; margin:0; }
+@media (max-width:680px) { .create-class-school { grid-template-columns:1fr; } }

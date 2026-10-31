@@ -81,3 +81,4 @@
 .design-surface .storybook-editor-shell .storybook-stage.format-landscape:not(.preview){width:min(100%,calc((100dvh - 40px) * 4 / 3))}
 .design-surface .storybook-editor-shell .storybook-stage.format-portrait:not(.preview){width:min(100%,calc((100dvh - 40px) * 3 / 4))}
 .storybook-stage-element.image:not(.selected){touch-action:pan-y pinch-zoom}
+.storybook-book-grid>article .storybook-ebook-link{display:flex;align-items:center;justify-content:center;min-height:44px;font-weight:700}

@@ -3,9 +3,10 @@ import "server-only";
 import { readFile } from "node:fs/promises";
 import { Resvg } from "@resvg/resvg-js";
 import sharp from "sharp";
-import { PDFDocument, rgb } from "pdf-lib";
+import { degrees, PDFDocument, rgb } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { storybookAspectRatio, type StorybookDocument } from "@/lib/storybook-model";
+import { spineFontSizeMm } from "@/lib/storybook-structure";
 import type { BookFeedback, Rubric } from "@/lib/book-rubric";
 import { defaultFeedbackExport, feedbackExportContent, type FeedbackExportOptions } from "@/lib/feedback-export";
 import { fittedStoryText, STORY_TEXT_LINE_HEIGHT } from "@/lib/storybook-text";
@@ -112,9 +113,12 @@ export function printPageCount(original: number, spec: PrintSpec) {
   if (count > spec.pageMax) throw new Error("선택한 판형의 최대 쪽 수를 넘었어요.");
   return count;
 }
-export async function printPdfs(images: Buffer[], spec: PrintSpec, size: PrintSize, title: string) {
+/** Rendered page order: images[0] is the front cover; with backCover the last image is the back cover. */
+export type PrintCoverOptions = { backCover?: boolean; spine?: { title: string; author: string } };
+export async function printPdfs(images: Buffer[], spec: PrintSpec, size: PrintSize, title: string, options: PrintCoverOptions = {}) {
   assertBookPrintSpec(spec);
-  const innerImages = images.slice(1);
+  const backImage = options.backCover && images.length > 1 ? images[images.length - 1] : undefined;
+  const innerImages = images.slice(1, backImage ? -1 : undefined);
   const count = printPageCount(innerImages.length, spec);
   assertBookPrintSize(size, count);
   const pt = (mm: number) => mm * 72 / 25.4;
@@ -142,14 +146,41 @@ export async function printPdfs(images: Buffer[], spec: PrintSpec, size: PrintSi
   const p = cover.addPage([pt(size.coverWidthMm), pt(size.coverHeightMm)]);
   p.drawRectangle({ x: 0, y: 0, width: p.getWidth(), height: p.getHeight(), color: rgb(.96, .94, .89) });
   const hinge = spec.hingeGapMm ?? 0;
-  // Center panels around the spine; artwork remains within trim and a 10mm safety margin.
+  // Spread layout: back cover (left) | spine | front cover (right). Panels are centred around the
+  // spine; artwork remains within trim and a 10mm safety margin.
   const panelW = pt(spec.innerTrimWidthMm), panelH = pt(spec.innerTrimHeightMm);
   const center = p.getWidth() / 2, spineHalf = pt(size.spineWidthMm / 2 + hinge);
-  for (const [src, x] of [[images[0], center + spineHalf]] as const) {
+  for (const [src, x] of [[images[0], center + spineHalf], [backImage, center - spineHalf - panelW]] as const) {
     if (!src) continue;
     const img = await cover.embedJpg(src), margin = pt(10);
     const scale = Math.min((panelW - margin * 2) / img.width, (panelH - margin * 2) / img.height);
     p.drawImage(img, { x: x + (panelW - img.width * scale) / 2, y: (p.getHeight() - img.height * scale) / 2, width: img.width * scale, height: img.height * scale });
   }
+  const spineFont = spineFontSizeMm(size.spineWidthMm);
+  const spineText = [options.spine?.title, options.spine?.author].map(value => value?.trim() ?? "").filter(Boolean).join("   ");
+  if (spineFont && spineText) {
+    cover.registerFontkit(fontkit);
+    const font = await cover.embedFont(await readFile(FONT_PATH), { subset: true });
+    // Korean spines read top to bottom: the baseline runs downward along the spine centre line.
+    const available = panelH - pt(24);
+    let fontSize = pt(spineFont);
+    while (fontSize > pt(2.5) && font.widthOfTextAtSize(spineText, fontSize) > available) fontSize *= 0.92;
+    const textWidth = Math.min(available, font.widthOfTextAtSize(spineText, fontSize));
+    p.drawText(spineText, { x: center - fontSize * 0.36, y: (p.getHeight() + textWidth) / 2, size: fontSize, font, color: rgb(0.16, 0.2, 0.18), rotate: degrees(-90) });
+  }
   return { cover: await cover.save(), inner: await inner.save(), pageCount: count, addedPages: count - innerImages.length };
+}
+
+/** Screen/download PDF: every page at the book's own proportions (243 × 248mm), no headers, footers or page numbers. */
+export async function viewPdf(images: Buffer[], format: StorybookDocument["format"], title: string) {
+  const pt = (mm: number) => mm * 72 / 25.4;
+  const width = 243, height = format === "squarebook-hc" ? 248 : Math.round(243 / storybookAspectRatio(format) * 100) / 100;
+  const pdf = await PDFDocument.create();
+  pdf.setTitle(title || "그림책"); pdf.setCreator("Wiggle"); pdf.setProducer("Wiggle");
+  for (const image of images) {
+    const page = pdf.addPage([pt(width), pt(height)]);
+    const embedded = await pdf.embedJpg(image);
+    page.drawImage(embedded, { x: 0, y: 0, width: page.getWidth(), height: page.getHeight() });
+  }
+  return pdf.save();
 }

@@ -5,6 +5,7 @@ import type { StorybookCrop, StorybookDocument, StorybookElement, StorybookPage 
 import { Logo } from "./Logo";
 import { StorybookTextInput } from "./StorybookTextInput";
 import { AuthenticatedImage } from "./AuthenticatedImage";
+import { downloadEbookPdf, requestEbookLink } from "@/lib/ebook-client";
 import "./storybook-editing.css";
 
 type TeacherBook = { id: string; classroomId: string; classroomName: string; studentId: string; nickname: string; animal: string; title: string; completedAt: string; document: StorybookDocument };
@@ -31,6 +32,7 @@ export function TeacherStorybookPreview({ classroomId, storybookId }: { classroo
   const [assets, setAssets] = useState<TeacherAsset[]>([]);
   const [pageIndex, setPageIndex] = useState(0);
   const [error, setError] = useState("");
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -51,15 +53,23 @@ export function TeacherStorybookPreview({ classroomId, storybookId }: { classroo
   const assetIds = useMemo(() => new Set(assets.map((asset) => asset.id)), [assets]);
   if (!book) return <main className="teacher-storybook-shell"><header className="teacher-storybook-header"><Logo /><a className="small-button" href={`/teacher/class/${classroomId}/books`}>← 그림책 목록</a></header>{error ? <p className="error-box">{error}</p> : <div className="loading-card">완성 그림책을 펼치는 중…</div>}</main>;
   const page = book.document.pages[pageIndex];
+  // A server-made PDF at the book's own 243 × 248mm size: no A4 paper, browser header/footer or page numbers.
+  async function downloadPdf() {
+    if (!book || downloading) return;
+    setDownloading(true); setError("");
+    try { const link = await requestEbookLink(book.id, { teacher: true }); await downloadEbookPdf(link.token, book.title); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "PDF를 만들지 못했어요."); }
+    finally { setDownloading(false); }
+  }
 
   return <main className="teacher-book-preview-shell">
-    <header className="teacher-book-preview-header"><Logo /><a className="small-button" href={`/teacher/class/${classroomId}/books`}>← 그림책 목록</a><div><p>{book.animal} {book.nickname} · {book.classroomName}</p><h1>{book.title}</h1></div><button type="button" className="button primary" onClick={() => window.print()}>PDF로 저장 · 인쇄</button></header>
+    <header className="teacher-book-preview-header"><Logo /><a className="small-button" href={`/teacher/class/${classroomId}/books`}>← 그림책 목록</a><div><p>{book.animal} {book.nickname} · {book.classroomName}</p><h1>{book.title}</h1></div><a className="button secondary" href={`/teacher/class/${classroomId}/books/${book.id}/ebook`}>📖 ebook으로 보기</a><button type="button" className="button primary" disabled={downloading} onClick={() => void downloadPdf()}>{downloading ? "PDF 만드는 중…" : "⬇️ PDF 다운로드"}</button></header>
+    {error && <p className="error-box" role="alert">{error}</p>}
     <section className="teacher-book-reader" aria-label={`${book.title} 그림책 미리보기`}>
       <button type="button" aria-label="이전 쪽" disabled={pageIndex === 0} onClick={() => setPageIndex((value) => value - 1)}>‹</button>
       <div className="teacher-book-current"><BookPage bookId={book.id} format={book.document.format} page={page} assetIds={assetIds} /><footer><b>{pageIndex + 1} / {book.document.pages.length}</b><span>{new Date(book.completedAt).toLocaleString("ko-KR", { dateStyle: "long", timeStyle: "short" })} 완성</span></footer></div>
       <button type="button" aria-label="다음 쪽" disabled={pageIndex === book.document.pages.length - 1} onClick={() => setPageIndex((value) => value + 1)}>›</button>
     </section>
     <nav className="teacher-book-thumbnails" aria-label="그림책 쪽 선택">{book.document.pages.map((item, index) => <button type="button" className={index === pageIndex ? "active" : ""} aria-current={index === pageIndex ? "page" : undefined} onClick={() => setPageIndex(index)} key={item.id}><span style={{ background: item.background }}>{index + 1}</span></button>)}</nav>
-    <section className="teacher-print-pages" aria-hidden="true">{book.document.pages.map((item, index) => <article key={item.id}><BookPage bookId={book.id} format={book.document.format} page={item} assetIds={assetIds} /><footer>{book.title} · {book.animal} {book.nickname} · {index + 1}/{book.document.pages.length}</footer></article>)}</section>
   </main>;
 }

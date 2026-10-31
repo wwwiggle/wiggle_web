@@ -1,4 +1,4 @@
-import { BOOK_PRINT_SPEC_UID, assertBookPrintSpec, assertBookPrintSize } from "@/lib/book-print-format";
+import { BOOK_PRINT_SPEC_UID, PRINT_LAYOUT_VERSION, assertBookPrintSpec, assertBookPrintSize } from "@/lib/book-print-format";
 import "server-only";
 import { randomUUID, createHash } from "node:crypto";
 import { bindings } from "@/db/runtime";
@@ -55,7 +55,7 @@ export async function submitPrintRequest(teacher: TeacherIdentity, body: Record<
       const job = await db.prepare(`SELECT * FROM book_print_jobs WHERE id = ? AND teacher_id = ? AND classroom_id = ? AND environment = ? AND status = 'ready'`).bind(source.jobId, teacher.id, classroomId, printEnvironment()).first<PrintJob>();
       const book = job && await workflowBook(teacher.id, job.storybook_id);
       if (!job || !book || book.revision !== job.revision || !job.layout_json) throw new Error("최신 완성본의 PDF를 먼저 준비해 주세요.");
-      if (JSON.parse(job.layout_json).sourceLayoutVersion !== 2) throw new Error("표지·내지 구분이 바뀌었어요. 인쇄 준비를 다시 눌러 주세요.");
+      if (JSON.parse(job.layout_json).sourceLayoutVersion !== PRINT_LAYOUT_VERSION) throw new Error("표지·내지 구분이 바뀌었어요. 인쇄 준비를 다시 눌러 주세요.");
       title = book.title; layout = JSON.parse(job.layout_json); coverKey = printObjectKey(job.id, "cover"); innerKey = printObjectKey(job.id, "inner");
     } else {
       const upload = await db.prepare(`SELECT * FROM print_uploads WHERE id = ? AND teacher_id = ? AND classroom_id = ? AND environment = ? AND status = 'ready'`).bind(String(source.uploadId), teacher.id, classroomId, printEnvironment()).first<{ id: string; title: string; layout_json: string }>();

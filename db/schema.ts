@@ -179,6 +179,19 @@ export const storybookAdvice = sqliteTable("storybook_advice", {
   seenAt: text("seen_at"),
 }, table => [index("storybook_advice_book_idx").on(table.storybookId, table.createdAt)]);
 
+// 그림책 ebook 보기 링크(2026-10-31). 외부 공유는 담임의 보호자 동의 확인 기록이 있어야 켜진다.
+export const storybookEbookLinks = sqliteTable("storybook_ebook_links", {
+  storybookId: text("storybook_id").primaryKey().references(() => storybooks.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  shared: integer("shared", { mode: "boolean" }).notNull().default(false),
+  sharedByTeacherId: text("shared_by_teacher_id").references(() => teachers.id, { onDelete: "set null" }),
+  consentMethod: text("consent_method", { enum: ["paper", "in_person", "phone", "school_portal"] }),
+  guardianConsentAt: text("guardian_consent_at"),
+  sharedAt: text("shared_at"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
 export const storybookMutations = sqliteTable("storybook_mutations", {
   requestId: text("request_id").notNull(),
   storybookId: text("storybook_id").notNull().references(() => storybooks.id, { onDelete: "cascade" }),

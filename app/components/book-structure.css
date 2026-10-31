@@ -1,0 +1,84 @@
+/* Book structure: page roles, cover spread, completion screen, pattern controls and the ebook viewer. */
+
+/* Page rail role badge (앞표지 / 뒷표지 / 면지 / 속표지 / 작가의 말). */
+.storybook-page-rail>button>small.storybook-page-role{display:block;max-width:100%;margin-top:2px;padding:1px 6px;border-radius:999px;background:#e8f0dc;color:#2d4a26;font-size:11px;font-weight:800;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.storybook-page-rail>button>small.role-front,.storybook-page-rail>button>small.role-back{background:#ffe7a3;color:#4d3a07}
+
+/* Back cover guide: kept clear for a future ISBN barcode. Shown while editing only, never printed. */
+.storybook-barcode-zone{position:absolute;z-index:10001;display:grid;place-items:center;border:2px dashed #b48a2c;border-radius:6px;background:repeating-linear-gradient(90deg,#ffffffd9 0 6px,#f6ecd2d9 6px 9px);pointer-events:none;text-align:center}
+.storybook-barcode-zone span{font-size:clamp(9px,1.6cqi,14px);font-weight:800;line-height:1.35;color:#6b4f12}
+
+/* Cover spread: back | spine | front, as the printed cover sheet. */
+.cover-spread-modal{width:min(1180px,100%);max-height:calc(100dvh - 40px);overflow:auto;padding:20px;border-radius:20px;background:#fffdf7;color:#294329;box-shadow:0 20px 60px #1c291f55}
+.cover-spread-modal>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.cover-spread-modal h2{margin:0;font-size:24px}
+.cover-spread-labels{display:grid;grid-template-columns:1fr auto 1fr;gap:0;margin-bottom:6px;text-align:center;font-weight:900;font-size:16px}
+.cover-spread-labels span:nth-child(2){padding-inline:8px;color:#7a5b16}
+.cover-spread-sheet{display:grid;align-items:stretch;padding:12px;border-radius:10px;background:#efe9da;box-shadow:inset 0 0 0 1px #d8cfb8}
+.cover-spread-panel{position:relative;aspect-ratio:243/248;min-width:0;container-type:inline-size}
+.cover-spread-panel .storybook-stage.preview{position:absolute;inset:0;min-width:0!important;width:100%!important;max-width:none!important;max-height:none!important;height:100%;aspect-ratio:auto;box-shadow:none;animation:none;border-radius:0}
+.cover-spread-panel.back{border-right:2px dashed #8b7a52}
+.cover-spread-panel.front{border-left:2px dashed #8b7a52}
+.cover-spread-safe{position:absolute;inset:4.1%;border:1px dotted #8b7a5299;pointer-events:none;z-index:10005}
+.cover-spread-empty{position:absolute;inset:0;display:grid;place-content:center;gap:8px;padding:16px;background:#f5f1e6;text-align:center;color:#5d5a48}
+.cover-spread-empty b{font-size:16px}
+.cover-spread-empty span{font-size:13px;line-height:1.5}
+.cover-spread-barcode{position:absolute;z-index:10004;display:grid;place-items:center;border:2px dashed #b48a2c;background:#fffaf0e6;color:#6b4f12;font-size:clamp(7px,3.2cqi,13px);font-weight:800;line-height:1.15;text-align:center;overflow:hidden;padding:2px}
+.cover-spread-spine{display:grid;place-items:center;min-width:30px;background:#e2d8bf;overflow:hidden}
+.cover-spread-spine span{writing-mode:vertical-rl;text-orientation:sideways;white-space:nowrap;font-weight:800;font-size:13px;color:#283428;max-height:100%;overflow:hidden;text-overflow:ellipsis}
+.cover-spread-spine small{writing-mode:vertical-rl;font-size:11px;color:#6d6650}
+.cover-spread-notes{margin:14px 0 0;padding-left:20px;font-size:14px;line-height:1.7}
+@media(max-width:680px){.cover-spread-modal{padding:14px}.cover-spread-labels{font-size:13px}.cover-spread-sheet{padding:6px}.cover-spread-spine span{font-size:10px}}
+
+/* Completion screen. */
+.storybook-completion{width:min(760px,100%);max-height:calc(100dvh - 40px);overflow:auto;padding:22px;border-radius:20px;background:#fffdf7;color:#294329;box-shadow:0 20px 60px #1c291f55}
+.storybook-completion h2{margin:4px 0 14px;font-size:24px;line-height:1.35;overflow-wrap:anywhere}
+.storybook-completion-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.storybook-completion-cover{position:relative;aspect-ratio:243/248;container-type:inline-size}
+.storybook-completion-cover .storybook-stage.preview{position:absolute;inset:0;min-width:0!important;width:100%!important;max-width:none!important;max-height:none!important;height:100%;aspect-ratio:auto;box-shadow:0 8px 22px #2b433130;border-radius:4px 10px 10px 4px}
+.storybook-completion-actions{display:grid;gap:10px}
+.storybook-completion-actions .button{min-height:48px}
+.storybook-completion-note{margin:4px 0 0;font-size:13px;line-height:1.6;color:#55624f}
+.storybook-completion-message{margin:0;padding:10px 12px;border-radius:12px;background:#eef6e4;font-size:14px;line-height:1.5}
+.storybook-completion footer{display:flex;justify-content:flex-end;margin-top:16px}
+@media(max-width:680px){.storybook-completion{padding:16px}.storybook-completion-body{grid-template-columns:1fr}.storybook-completion-cover{width:min(100%,260px);justify-self:center}}
+
+/* Pattern endpaper controls. */
+.storybook-pattern-controls{margin-top:18px;padding-top:14px;border-top:1px solid #dbe3d0}
+.storybook-pattern-controls h3{margin:0 0 8px;font-size:16px}
+.storybook-pattern-controls fieldset{border:0;padding:0;margin:10px 0}
+.storybook-pattern-controls legend{font-size:14px;margin-bottom:6px}
+.storybook-pattern-controls .storybook-align-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.storybook-pattern-controls .storybook-align-buttons button{min-height:44px;border:1px solid #bbc6ad;border-radius:12px;background:#fffdf6;color:#294329;font:inherit;cursor:pointer}
+.storybook-pattern-controls .book-check{display:flex;align-items:center;gap:8px;margin:8px 0}
+.storybook-pattern-controls .book-check input{width:20px;min-height:20px}
+.storybook-pattern-controls p{font-size:13px;line-height:1.6}
+
+/* ebook viewer. */
+.ebook-message{min-height:100dvh;display:grid;place-content:center;gap:16px;padding:24px;text-align:center}
+.ebook-viewer{grid-template-rows:auto auto auto minmax(0,1fr) auto}
+.ebook-viewer>header>b{min-width:0}
+.ebook-banner{margin:0 0 6px;padding:8px 12px;border-radius:12px;background:#fff4cf;color:#4d3a07;font-size:14px;line-height:1.5;text-align:center}
+.ebook-share{margin:0 0 8px;padding:10px 14px;border-radius:14px;background:#fffdf7;color:#294329;box-shadow:0 2px 10px #26351e14}
+.ebook-share summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:800}
+.ebook-share div{display:grid;gap:10px;margin-bottom:8px}
+.ebook-share p{margin:0;font-size:14px;line-height:1.6}
+.ebook-share label{display:grid;gap:6px;font-size:14px}
+.ebook-share select{min-height:44px;border:1px solid #bbc6ad;border-radius:10px;padding:0 10px;font:inherit;background:#fff}
+.ebook-share .book-check{display:flex;align-items:center;gap:8px}
+.ebook-share .book-check input{width:20px;min-height:20px;flex:none}
+.ebook-share .text-button{min-height:44px}
+.ebook-single .reader-spread{width:min(100%,calc((100dvh - 200px) * var(--page-ratio)))}
+.design-surface .ebook-single.storybook-reader .reader-page.storybook-stage.preview{width:100%}
+.design-surface .ebook-spread.storybook-reader .reader-spread.is-cover .reader-page.storybook-stage.preview{width:50%}
+.ebook-viewer:fullscreen{padding:16px}
+@media(max-width:680px){
+  .ebook-viewer>header{flex-wrap:wrap;gap:6px;min-height:0}
+  .ebook-viewer>header>div{width:100%;flex-wrap:nowrap!important;gap:6px}
+  .design-surface .ebook-viewer>header .small-button{flex:1 1 0;min-width:0;min-height:44px;padding:6px 4px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* The page shrinks to the height left after the header, arrows and counter, so nothing overlaps. */
+  .ebook-single .reader-spread{width:min(100%,calc((100dvh - 230px) * var(--page-ratio)))}
+  .design-surface .ebook-single .reader-spread.is-cover .reader-right{width:100%!important}
+}
+@media(max-width:400px){.ebook-viewer .ebook-icon{display:none}}
+@media(max-height:700px) and (max-width:680px){.storybook-completion-cover{width:min(100%,170px)}.storybook-completion h2{font-size:20px}}

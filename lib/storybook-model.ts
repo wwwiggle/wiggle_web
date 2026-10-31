@@ -21,9 +21,12 @@ export function storybookAspectRatio(format: StorybookFormat) {
 }
 export type StorybookTextAlign = "left" | "center" | "right";
 export type StorybookVerticalAlign = "top" | "middle" | "bottom";
-export const STORYBOOK_TEMPLATES = ["inner", "cover", "title", "author", "blank"] as const;
+// "back" marks the last page as the back cover; "pattern" is an endpaper made of one repeated picture.
+export const STORYBOOK_TEMPLATES = ["inner", "cover", "title", "author", "pattern", "back", "blank"] as const;
 export type StorybookTemplate = (typeof STORYBOOK_TEMPLATES)[number];
-export const STORYBOOK_TEMPLATE_LABELS: Record<StorybookTemplate, string> = { inner: "내지", cover: "겉표지", title: "속표지", author: "작가의 말", blank: "자유롭게" };
+export const STORYBOOK_TEMPLATE_LABELS: Record<StorybookTemplate, string> = { inner: "내지", cover: "앞표지", title: "속표지", author: "작가의 말", pattern: "패턴 면지", back: "뒷표지", blank: "자유롭게" };
+/** Filled into empty title/credit fields when a cover or title-page layout is chosen. Never overwrites written text. */
+export type StorybookTemplateContext = { title?: string; credit?: string };
 export type StorybookCrop = { x: number; y: number; width: number; height: number };
 
 export const DEFAULT_STORYBOOK_TEXT = "여기에 이야기를 써 보세요";
@@ -182,8 +185,9 @@ export function validateStorybookDocument(value: unknown): StorybookDocument | n
 
 // Applying a layout is explicit. Loading a saved book must never merge, truncate or move its contents.
 // Extra text, illustrations and PDF backgrounds survive every template change.
-export function applyStorybookTemplate(page: StorybookPage, template: StorybookTemplate, makeId: () => string): StorybookPage {
-  if (template === "blank") return { ...page, template };
+export function applyStorybookTemplate(page: StorybookPage, template: StorybookTemplate, makeId: () => string, context: StorybookTemplateContext = {}): StorybookPage {
+  if (template === "blank" || template === "back" || template === "pattern") return { ...page, template };
+  const autoText = (role: StorybookElement["textRole"]) => cleanStoryText((role === "title" ? context.title : role === "credit" ? context.credit : undefined)?.trim() ?? "").slice(0, 120) || undefined;
   const fields: Partial<StorybookElement>[] = template === "cover" || template === "title" ? [
     { textRole: "title", x: .08, y: template === "cover" ? .08 : .18, width: .84, height: .2, fontSize: .065, align: "center" },
     { textRole: "credit", x: .12, y: .82, width: .76, height: .09, fontSize: .026, align: "center" },
@@ -198,10 +202,10 @@ export function applyStorybookTemplate(page: StorybookPage, template: StorybookT
     if (index < 0) index = elements.findIndex(element => element.type === "text" && !element.textRole && !used.has(element.id));
     if (index >= 0) {
       const original = elements[index];
-      elements[index] = { ...original, verticalAlign: "middle", ...field, text: original.text || field.text || "" };
+      elements[index] = { ...original, verticalAlign: "middle", ...field, text: original.text || field.text || autoText(field.textRole) || "" };
       used.add(original.id);
     } else {
-      const element = { ...createStorybookTextElement(makeId()), verticalAlign: "middle" as const, ...field };
+      const element = { ...createStorybookTextElement(makeId()), verticalAlign: "middle" as const, ...field, text: field.text || autoText(field.textRole) || "" };
       elements.push(element); used.add(element.id);
     }
   }
