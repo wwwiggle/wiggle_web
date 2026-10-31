@@ -3,7 +3,8 @@ import { bindings } from "@/db/runtime";
 import { createHash, randomUUID } from "node:crypto";
 import { defaultRubric, feedbackPrompt, rubricVersion, validateFeedback, type Rubric } from "@/lib/book-rubric";
 import { validateStorybookDocument } from "@/lib/storybook-model";
-import { renderBookPages, type BookIdentity } from "@/lib/book-render";
+import type { BookIdentity } from "@/lib/book-render-shared";
+import { bookPageImages, type BookRenderSource } from "@/lib/book-render-service";
 
 export async function bookClassroom(teacherId: string, classroomId: string) {
   return bindings().DB.prepare(`SELECT c.id, c.display_name AS displayName, s.grade, s.class_number AS classNumber, s.rubric_json AS rubricJson, s.rubric_filename AS rubricFilename FROM classrooms c LEFT JOIN classroom_book_settings s ON s.classroom_id = c.id WHERE c.id = ? AND c.teacher_id = ? AND c.active = 1`).bind(classroomId, teacherId).first<{ id: string; displayName: string; grade: number | null; classNumber: number | null; rubricJson: string | null; rubricFilename: string | null }>();
@@ -25,20 +26,24 @@ export function selectedBookIds(value: unknown) {
   if (!Array.isArray(value) || !value.length || value.length > 50 || value.some((v) => typeof v !== "string" || !/^storybook_[a-zA-Z0-9_-]{8,64}$/.test(v)) || new Set(value).size !== value.length) throw new Error("완성 그림책 1~50권을 중복 없이 선택해 주세요.");
   return value as string[];
 }
-export async function loadBookImages(book: WorkflowBook, width = 1200) {
+/** 그릴 책 문서와 그림 저장소 키. 그림 소유·용량 확인은 여기서 하고, 그림을 읽고 그리는 일은 book-render-service가 한다. */
+export async function bookRenderSource(book: WorkflowBook): Promise<BookRenderSource> {
   const doc = validateStorybookDocument(JSON.parse(book.documentJson));
   if (!doc) throw new Error("그림책 문서가 올바르지 않아요.");
   const needed = new Set(doc.pages.flatMap((p) => [p.backgroundAssetId, ...p.elements.map((e) => e.assetId)]).filter((v): v is string => Boolean(v)));
-  const assets = new Map<string, Buffer>();
+  const assetKeys: Record<string, string> = {};
   let total = 0;
   for (const assetId of needed) {
     const row = await bindings().DB.prepare(`SELECT object_key AS objectKey, byte_size AS byteSize FROM storybook_assets WHERE id = ? AND storybook_id = ? AND student_id = ?`).bind(assetId, book.id, book.studentId).first<{ objectKey: string; byteSize: number }>();
     if (!row || row.byteSize > 4_500_000 || (total += row.byteSize) > 80_000_000) throw new Error("이미지를 모두 읽을 수 없어요. 누락 또는 책 전체 용량(80MB)을 확인해 주세요.");
-    const object = await bindings().ARTWORKS.get(row.objectKey);
-    if (!object) throw new Error("그림책 이미지가 누락되었어요.");
-    assets.set(assetId, Buffer.from(await object.arrayBuffer()));
+    assetKeys[assetId] = row.objectKey;
   }
-  return { document: doc, images: await renderBookPages(doc, assets, width) };
+  return { document: doc, assetKeys };
+}
+
+export async function loadBookImages(book: WorkflowBook, width = 1200) {
+  const source = await bookRenderSource(book);
+  return { document: source.document, images: await bookPageImages(source, width) };
 }
 
 export async function enqueueFeedback(teacherId: string, classroomId: string, ids: string[]) {

@@ -6,7 +6,7 @@ import { cleanText, type TeacherIdentity } from "@/lib/security";
 import { bookClassroom, workflowBook } from "@/lib/book-workflow";
 import { printObjectKey, validateShipping, type PrintJob } from "@/lib/book-print-workflow";
 import { printEnvironment, sweetbook, SweetbookError } from "@/lib/sweetbook";
-import { printPageCount, type PrintSpec, type PrintSize } from "@/lib/book-render";
+import { printPageCount, type PrintSpec, type PrintSize } from "@/lib/book-render-shared";
 import { validatePrintPdf, type PrintLayout, type PageMeasurement } from "@/lib/print-validation";
 
 export type RequestItem = { id: string; title: string; quantity: number; layout: PrintLayout; cover: string; inner: string; coverHash: string; innerHash: string; measurements: { cover: PageMeasurement[]; inner: PageMeasurement[] } };

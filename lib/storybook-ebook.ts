@@ -2,8 +2,8 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { bindings, ensureSchema } from "@/db/runtime";
 import { requireTeacher, studentFromRequest } from "@/lib/security";
-import { loadBookImages, type WorkflowBook } from "@/lib/book-workflow";
-import { viewPdf } from "@/lib/book-render";
+import { bookRenderSource, type WorkflowBook } from "@/lib/book-workflow";
+import { bookViewPdf } from "@/lib/book-render-service";
 import { validateStorybookDocument } from "@/lib/storybook-model";
 
 // One unguessable link per book. A link never grants access by itself unless the class teacher
@@ -70,8 +70,7 @@ export function ebookDocument(book: EbookBookRow) {
 
 export async function ebookPdf(book: EbookBookRow) {
   const workflow: WorkflowBook = { id: book.storybookId, classroomId: book.classroomId, studentId: book.studentId, revision: 0, documentJson: book.documentJson, title: book.title, grade: null, classNumber: null, seatNumber: null, realName: null };
-  const { document, images } = await loadBookImages(workflow, 1800);
-  return viewPdf(images, document.format, book.title);
+  return bookViewPdf(await bookRenderSource(workflow), 1800, book.title);
 }
 
 /** Download name: title only — never the child's name. */

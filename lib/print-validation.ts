@@ -1,5 +1,5 @@
 import { PDFDocument, PDFName, PDFNumber } from "pdf-lib";
-import type { PrintSize, PrintSpec } from "@/lib/book-render";
+import type { PrintSize, PrintSpec } from "@/lib/book-render-shared";
 export type PrintLayout = { spec: PrintSpec; size: PrintSize; pageCount: number; originalPages?: number; addedPages?: number };
 export type PageMeasurement = { page: number; widthMm: number; heightMm: number };
 export async function validatePrintPdf(bytes: Uint8Array, kind: "cover" | "inner", layout: PrintLayout) {
