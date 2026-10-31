@@ -1,5 +1,12 @@
 # Wiggle Web 현재 상태
 
+## 2026-11-01 점검 모드와 DB 이사 당일 진행표 (`claude/maintenance-mode`)
+
+- 사용자 결정 "A 진행하자": 서버는 Vercel 그대로 두고 DB만 먼저 Supabase로 옮긴다. 당일 순서는 `docs/db-cutover.md`.
+- `proxy.ts`(Next 16 Proxy, Node 런타임): `WIGGLE_MAINTENANCE=1`이면 `/api/health`를 뺀 모든 API가 503(`retry-after: 300`, "지금 잠깐 점검 중이에요…")을 돌려준다. 읽기 요청도 세션·요청 횟수를 기록하므로 함께 막는다(리허설에서 복사 중 바뀐 표 2개가 그 예). 아이 그림 저장은 5xx를 받으면 기기에 남겨 두고 다시 보낸다. 변수가 없으면 아무 영향이 없다.
+- 검증: `tests/maintenance-mode.test.mjs`(켜면 상태 확인만 200·나머지 503, 끄면 평소대로), production build에 Proxy 포함 확인, Turso 전체 458/458. Postgres 전체는 `entry-failure-limit` 4건이 PR #46의 테스트 준비 코드 수정 전이라 실패(이 브랜치는 그 수정 전 main 기준) — PR #46과 함께 합치면 통과한다.
+- 남은 위험: 그림책 편집기는 저장 실패 시 화면에 문구를 띄우고 내용을 화면에만 들고 있다(기기에 따로 보관하지 않음). 점검 중 편집하던 아이가 창을 닫으면 그 사이 고친 것은 잃는다 → 수업 없는 시간에 한다.
+
 ## 2026-11-01 DB 이사 리허설: 운영 Turso → 개발 Supabase
 
 - 운영 Turso(`wiggle-yonghwan86`)를 읽기만 해서 개발 Supabase `web`에 복사(`scripts/migrate-turso-to-postgres.mjs --truncate-target`). 44표·약 2만 2천 행, 복사 10초·전체 22초.
