@@ -32,5 +32,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "render-service/cloudflare"]
+  "exclude": ["node_modules", "render-service/cloudflare", ".open-next", ".wrangler"]
 }

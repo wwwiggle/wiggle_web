@@ -66,3 +66,5 @@ next-env.d.ts
 /_bmad/custom/config.user.toml
 /public/pdfjs/
 /render-service/cloudflare/node_modules
+/.open-next
+/.dev.vars

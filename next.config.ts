@@ -28,11 +28,31 @@ const familyHeaders = [
   },
 ];
 
+// Cloudflare Workers로 빌드할 때(`npm run build:cloudflare`): Workers에서 못 도는 네이티브 모듈을 대체 모듈로 바꾼다.
+// 그림책 그리기는 그리기 서버(render-service), DB는 Supabase가 맡는다. Vercel 빌드에는 영향이 없다.
+const cloudflare = process.env.WIGGLE_TARGET === "cloudflare";
+// 요청 이름이나 실제 파일 경로가 맞으면 대체 모듈로 바꾼다(`@/…` 별칭은 Next가 먼저 풀기 때문에 경로로 잡는다).
+// 끝을 고정해 book-render-shared 같은 이웃 모듈은 그대로 둔다.
+const cloudflareReplacements: [RegExp, string][] = [
+  [/(^@\/lib\/book-render$)|([\\/]lib[\\/]book-render(\.ts)?$)/, "./lib/cloudflare-stubs/book-render.ts"],
+  [/[\\/]db[\\/]adapters[\\/]turso-d1(\.ts)?$/, "./lib/cloudflare-stubs/turso-d1.ts"],
+];
+
 const nextConfig: NextConfig = {
   // 저장소의 제품·보안 규칙 AGENTS.md를 Next가 실행 때마다 자동 수정하지 않게 한다.
   agentRules: false,
   // libSQL 클라이언트는 네이티브 바인딩을 포함하므로 서버 번들에 넣지 않는다.
-  serverExternalPackages: ["@libsql/client", "libsql", "@resvg/resvg-js", "sharp"],
+  // Cloudflare: postgres는 Next가 묶지 않게 두어, OpenNext가 Workers용 빌드(workerd 조건 → cloudflare:sockets)를 고르게 한다.
+  // Next가 묶으면 Node용(net 모듈)이 들어가 DB 요청이 멈춘다.
+  serverExternalPackages: cloudflare ? ["postgres"] : ["@libsql/client", "libsql", "@resvg/resvg-js", "sharp"],
+  ...(cloudflare
+    ? {
+        webpack(config: { plugins: unknown[] }, { webpack }: { webpack: { NormalModuleReplacementPlugin: new (pattern: RegExp, replacement: string) => unknown } }) {
+          for (const [pattern, to] of cloudflareReplacements) config.plugins.push(new webpack.NormalModuleReplacementPlugin(pattern, new URL(to, import.meta.url).pathname));
+          return config;
+        },
+      }
+    : {}),
   outputFileTracingIncludes: { "/api/teacher/*": ["./config/rubrics/**/*", "./public/fonts/**/*"] },
   // dev 도구 부유 버튼이 어린이용 UI의 히트 테스트(브라우저 실측)를 가린다.
   devIndicators: false,

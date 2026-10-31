@@ -47,9 +47,10 @@ export async function upsertGoogleTeacher(email: string, displayName: string): P
 }
 
 export async function requireTeacher(): Promise<TeacherIdentity | null> {
-  await ensureSchema();
+  // 쿠키를 먼저 읽는다: 빌드 때 미리 그리는 페이지(/admin 등)가 여기서 동적 페이지로 판정돼, 빌드가 DB에 닿지 않는다.
   const token = (await cookies()).get("wiggle_teacher")?.value;
   if (!token) return null;
+  await ensureSchema();
   const tokenHash = await sha256(token);
   const now = new Date().toISOString();
   const row = await bindings().DB.prepare(
