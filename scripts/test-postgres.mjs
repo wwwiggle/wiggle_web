@@ -30,6 +30,10 @@ const pg = new EmbeddedPostgres({
   password,
   port,
   persistent: false,
+  // initdb는 셸 로캘을 따라 인코딩을 고른다. LANG이 빈 셸(앱·CI)에서는 SQL_ASCII가 되어
+  // 별명 비교의 CHAR(160)·CHAR(12288)가 "requested character too large for encoding"으로 500을 냈다.
+  // Supabase와 같은 UTF8에 코드포인트 순 정렬(C)로 고정한다.
+  initdbFlags: ["--encoding=UTF8", "--no-locale"],
   postgresFlags: ["-c", "max_connections=400", "-c", "fsync=off"],
   onLog: () => {},
 });

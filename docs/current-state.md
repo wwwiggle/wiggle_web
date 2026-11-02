@@ -1,5 +1,12 @@
 # Wiggle Web 현재 상태
 
+## 2026-11-03 Postgres 테스트 5건 실패 — 테스트 DB 인코딩 (`claude/postgres-test-fixes`)
+
+- **증상.** 손대지 않은 main(`00a49f9`)에서 `npm run test:postgres`가 5건 실패(명단 코드 다시 뽑기, 학급 만들기 학교·학년, 학생 상태·자리 재입장, 손들기, 오늘 수업 최근 그림). 모두 API 500. SQLite(`npm test`)는 통과.
+- **원인.** 앱 코드·PR #51과 무관하다. 서버 기록(`WIGGLE_TEST_SERVER_LOG`)에 `requested character too large for encoding: 12288` — 별명 비교(`lib/nickname.ts`의 `CHAR(160)`·`CHAR(12288)` → 어댑터가 `chr()`로 바꿈)가 터졌다. 내장 Postgres의 `initdb`가 셸 로캘을 따라 인코딩을 고르는데, `LANG`이 빈 셸(Claude 앱 등)에서는 C 로캘 → **`SQL_ASCII`** DB가 되어 127 넘는 `chr()`를 거부한다. `LANG=en_US.UTF-8`을 주면 고치기 전 코드로도 통과함을 확인했다. Supabase는 UTF8이라 운영에는 영향 없다.
+- **고침.** `scripts/test-postgres.mjs`가 `initdb`에 `--encoding=UTF8 --no-locale`을 넘긴다(셸 로캘과 무관하게 UTF8, 정렬은 코드포인트 순). 어느 기기·셸에서 돌려도 같은 DB가 만들어진다.
+- 검증(`LANG`이 빈 셸): `npm run test:postgres` 460/461 통과·실패 0(건너뜀 1 = MVP3 옛 스키마 업그레이드), `npm test` 468/470 통과·실패 0(건너뜀 2), typecheck 통과, lint 오류 0(경고 14는 기존).
+
 ## 2026-11-02 그림 잠금 확대·면지 없앰·내지 24쪽·ebook 서재·속도 (`claude/paid-lock-ebook-shelf`)
 
 결정과 이유는 `product-decisions.md` 「2026-11-02 그림 유료 잠금 확대…」에 있다.
