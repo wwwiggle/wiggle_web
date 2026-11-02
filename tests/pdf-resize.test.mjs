@@ -159,3 +159,63 @@ test("page ranges, UserUnit, annotations and bad input", async () => {
   const encrypted = Buffer.from(Buffer.from(source).toString("latin1").replace("trailer\n<<", "trailer\n<<\n/Encrypt << /Filter /Standard /V 1 /R 2 >>"), "latin1");
   await assert.rejects(resizePdf(encrypted, { widthMm: 210, heightMm: 210 }), /암호가 걸린 PDF/);
 });
+
+/** One 100×100pt page whose content is a single raw stream (not an array), like Chrome/Quartz/InDesign output. */
+async function rawPagePdf(content, { inherit = false, contents = true } = {}) {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([100, 100]);
+  page.node.delete(PDFName.of("Contents"));
+  if (contents) page.node.set(PDFName.of("Contents"), pdf.context.register(pdf.context.flateStream(content)));
+  if (inherit) {
+    // MediaBox and Resources only on the parent Pages node
+    const parent = page.node.Parent();
+    parent.set(PDFName.of("MediaBox"), page.node.get(PDFName.of("MediaBox")));
+    parent.set(PDFName.of("Resources"), pdf.context.obj({}));
+    page.node.delete(PDFName.of("MediaBox"));
+    page.node.delete(PDFName.of("Resources"));
+  }
+  return pdf.save({ useObjectStreams: false });
+}
+
+test("single-stream, inherited and missing contents are scaled, not just re-boxed", async () => {
+  // red square over the left-bottom half of a 100pt page
+  for (const inherit of [false, true]) {
+    const source = await rawPagePdf("1 0 0 rg 0 0 50 50 re f", { inherit });
+    const result = await resizePdf(source, { widthMm: 200 / PT, heightMm: 200 / PT, mode: "stretch", background: null });
+    const page = await render(result.bytes, 1, 1);
+    assert.deepEqual(page.mm.map(Math.round), [71, 71], "200pt page");
+    assert.deepEqual(pixel(page, 25, 45), [255, 0, 0], `inherit=${inherit}: square grew to 100pt (35mm) instead of staying 50pt`);
+  }
+  const blank = await resizePdf(await rawPagePdf("", { contents: false }), { widthMm: 50, heightMm: 50, background: "#00ff00" });
+  assert.deepEqual(pixel(await render(blank.bytes), 25, 25), [0, 255, 0], "page without contents still gets the background");
+});
+
+test("stray Q in broken content cannot undo the resize", async () => {
+  const source = await rawPagePdf("Q Q 1 0 0 rg 0 0 50 50 re f q");
+  const result = await resizePdf(source, { widthMm: 200 / PT, heightMm: 200 / PT, mode: "stretch", background: null });
+  assert.deepEqual(pixel(await render(result.bytes, 1, 1), 25, 45), [255, 0, 0]);
+});
+
+test("gradients and patterns scale with the page (they are anchored to the form, not the page)", async () => {
+  const pdf = await PDFDocument.create(), page = pdf.addPage([100, 100]), ctx = pdf.context;
+  const shading = ctx.obj({ ShadingType: 2, ColorSpace: "DeviceRGB", Coords: [0, 0, 100, 0], Extend: [true, true], Function: { FunctionType: 2, Domain: [0, 1], C0: [1, 0, 0], C1: [0, 0, 1], N: 1 } });
+  page.node.set(PDFName.of("Resources"), ctx.obj({ Pattern: { P0: ctx.obj({ PatternType: 2, Shading: shading }) } }));
+  page.node.set(PDFName.of("Contents"), ctx.register(ctx.flateStream("/Pattern cs /P0 scn 0 0 100 100 re f")));
+  const result = await resizePdf(await pdf.save(), { widthMm: 200 / PT, heightMm: 200 / PT, mode: "stretch" });
+  const centre = pixel(await render(result.bytes, 1, 1), 35.3, 35.3); // page centre
+  assert.ok(centre[0] > 100 && centre[0] < 160 && centre[1] < 40 && centre[2] > 100 && centre[2] < 160, `centre is the red→blue midpoint, got ${centre}`);
+});
+
+test("a content stream shared with an untouched page is kept; otherwise it is dropped", async () => {
+  const pdf = await PDFDocument.create();
+  const stream = pdf.context.register(pdf.context.flateStream("1 0 0 rg 0 0 50 50 re f"));
+  for (let i = 0; i < 2; i++) { const page = pdf.addPage([100, 100]); page.node.set(PDFName.of("Contents"), stream); }
+  const source = await pdf.save();
+  const one = await resizePdf(source, { widthMm: 200 / PT, heightMm: 200 / PT, mode: "stretch", pages: [1] });
+  assert.deepEqual(pixel(await render(one.bytes, 2, 1), 10, 30), [255, 0, 0], "page 2 still draws its square");
+  assert.deepEqual(pixel(await render(one.bytes, 1, 1), 25, 45), [255, 0, 0], "page 1 square doubled");
+  const both = await resizePdf(source, { widthMm: 200 / PT, heightMm: 200 / PT, mode: "stretch" });
+  for (const n of [1, 2]) assert.deepEqual(pixel(await render(both.bytes, n, 1), 25, 45), [255, 0, 0]);
+  const objects = (bytes) => PDFDocument.load(bytes).then((d) => d.context.enumerateIndirectObjects().length);
+  assert.ok(await objects(both.bytes) <= (await objects(source)) + 4, "no orphaned copies of the old content");
+});

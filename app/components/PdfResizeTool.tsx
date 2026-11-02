@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import type { PdfResizeMode, PdfResizeResult } from "@/lib/pdf-resize";
 import "./book-workflow.css";
 import "./pdf-resize-tool.css";
@@ -20,26 +21,51 @@ type SourceInfo = { name: string; bytes: Uint8Array; pageCount: number; sizes: s
 const fileSize = (bytes: number) => bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 1024))}KB` : `${(bytes / 1024 / 1024).toFixed(2)}MB`;
 const sides = (v: { left: number; right: number; top: number; bottom: number }) => v.left + v.right + v.top + v.bottom === 0 ? "없음" : `좌 ${v.left} · 우 ${v.right} · 위 ${v.top} · 아래 ${v.bottom}`;
 
-async function renderPage(bytes: Uint8Array, pageNumber: number, canvas: HTMLCanvasElement, trimInsetMm?: number) {
+// One open pdf.js document per preview side, kept while its bytes stay the same so changing the page does not re-read a large file.
+type PreviewSlot = { current: { bytes: Uint8Array; task: PDFDocumentLoadingTask } | null };
+type RenderRun = { cancelled: boolean; task?: RenderTask };
+
+async function openPreview(slot: PreviewSlot, bytes: Uint8Array): Promise<PDFDocumentProxy> {
   const pdfjs = await import("pdfjs-dist");
-  pdfjs.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs";
-  // pdf.js transfers the buffer to its worker, so hand it a copy.
-  const task = pdfjs.getDocument({ data: bytes.slice(), cMapUrl: "/pdfjs/cmaps/", cMapPacked: true, standardFontDataUrl: "/pdfjs/standard_fonts/", wasmUrl: "/pdfjs/wasm/" });
-  try {
-    const pdf = await task.promise;
-    const page = await pdf.getPage(Math.min(Math.max(1, pageNumber), pdf.numPages));
-    const base = page.getViewport({ scale: 1 }), scale = 420 * Math.min(2, window.devicePixelRatio || 1) / Math.max(base.width, base.height);
-    const viewport = page.getViewport({ scale });
-    canvas.width = Math.round(viewport.width); canvas.height = Math.round(viewport.height);
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    await page.render({ canvas, canvasContext: context, viewport }).promise;
-    if (trimInsetMm) {
-      const inset = trimInsetMm * 72 / 25.4 * scale;
-      context.setLineDash([6, 4]); context.lineWidth = 1.5; context.strokeStyle = "#e0245e";
-      context.strokeRect(inset, inset, canvas.width - 2 * inset, canvas.height - 2 * inset);
-    }
-  } finally { await task.destroy(); }
+  if (slot.current?.bytes !== bytes) {
+    void slot.current?.task.destroy();
+    pdfjs.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs";
+    // pdf.js transfers the buffer to its worker, so hand it a copy.
+    slot.current = { bytes, task: pdfjs.getDocument({ data: bytes.slice(), cMapUrl: "/pdfjs/cmaps/", cMapPacked: true, standardFontDataUrl: "/pdfjs/standard_fonts/", wasmUrl: "/pdfjs/wasm/" }) };
+  }
+  return slot.current.task.promise;
+}
+
+function closePreview(slot: PreviewSlot) { void slot.current?.task.destroy(); slot.current = null; }
+
+async function drawPage(pdf: PDFDocumentProxy, pageNumber: number, canvas: HTMLCanvasElement, run: RenderRun, trimInsetMm = 0) {
+  const page = await pdf.getPage(Math.min(Math.max(1, pageNumber), pdf.numPages));
+  if (run.cancelled) return;
+  const base = page.getViewport({ scale: 1 }), scale = 420 * Math.min(2, window.devicePixelRatio || 1) / Math.max(base.width, base.height);
+  const viewport = page.getViewport({ scale });
+  canvas.width = Math.round(viewport.width); canvas.height = Math.round(viewport.height);
+  const context = canvas.getContext("2d");
+  if (!context) return;
+  run.task = page.render({ canvas, canvasContext: context, viewport });
+  await run.task.promise;
+  if (trimInsetMm && !run.cancelled) {
+    const inset = trimInsetMm * 72 / 25.4 * scale;
+    context.setLineDash([6, 4]); context.lineWidth = 1.5; context.strokeStyle = "#e0245e";
+    context.strokeRect(inset, inset, canvas.width - 2 * inset, canvas.height - 2 * inset);
+  }
+}
+
+/** Draws one page into a canvas; a newer call (or unmount) cancels the one still drawing. */
+function usePreview(slot: PreviewSlot, bytes: Uint8Array | undefined, pageNumber: number, canvas: React.RefObject<HTMLCanvasElement | null>, trimInsetMm: number, onError: () => void) {
+  useEffect(() => {
+    const target = canvas.current;
+    if (!bytes || !target) return;
+    const run: RenderRun = { cancelled: false };
+    void openPreview(slot, bytes).then((pdf) => run.cancelled ? undefined : drawPage(pdf, pageNumber, target, run, trimInsetMm)).catch((error) => {
+      if (!run.cancelled && error?.name !== "RenderingCancelledException") onError();
+    });
+    return () => { run.cancelled = true; run.task?.cancel(); };
+  }, [slot, bytes, pageNumber, canvas, trimInsetMm, onError]);
 }
 
 export function PdfResizeTool() {
@@ -55,14 +81,14 @@ export function PdfResizeTool() {
   const [previewPage, setPreviewPage] = useState(1);
   const [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const beforeCanvas = useRef<HTMLCanvasElement>(null), afterCanvas = useRef<HTMLCanvasElement>(null);
+  const beforeDoc = useRef<PreviewSlot["current"]>(null), afterDoc = useRef<PreviewSlot["current"]>(null);
 
   useEffect(() => () => { if (result) URL.revokeObjectURL(result.url); }, [result]);
-  useEffect(() => {
-    if (source && beforeCanvas.current) void renderPage(source.bytes, previewPage, beforeCanvas.current).catch(() => setMessage("원본 미리보기를 그리지 못했어요."));
-  }, [source, previewPage]);
-  useEffect(() => {
-    if (result && afterCanvas.current) void renderPage(result.bytes, previewPage, afterCanvas.current, result.bleedMm).catch(() => setMessage("결과 미리보기를 그리지 못했어요."));
-  }, [result, previewPage]);
+  useEffect(() => () => { closePreview(beforeDoc); closePreview(afterDoc); }, []);
+  const beforeFailed = useCallback(() => setMessage("원본 미리보기를 그리지 못했어요."), []);
+  const afterFailed = useCallback(() => setMessage("결과 미리보기를 그리지 못했어요."), []);
+  usePreview(beforeDoc, source?.bytes, previewPage, beforeCanvas, 0, beforeFailed);
+  usePreview(afterDoc, result?.bytes, previewPage, afterCanvas, result?.bleedMm ?? 0, afterFailed);
 
   function choosePreset(id: (typeof PRESETS)[number]["id"]) {
     setPreset(id);
@@ -71,9 +97,10 @@ export function PdfResizeTool() {
   }
 
   async function chooseFile(file: File | undefined) {
-    setResult(null); setMessage(""); setSource(null); setPreviewPage(1);
+    setResult(null); setMessage(""); setSource(null); setPreviewPage(1); closePreview(beforeDoc); closePreview(afterDoc);
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".pdf") || file.size > 200_000_000) { setMessage("200MB 이하의 PDF를 골라 주세요."); return; }
+    if (!file.name.toLowerCase().endsWith(".pdf")) { setMessage("PDF 파일(.pdf)을 골라 주세요."); return; }
+    if (file.size > 200_000_000) { setMessage("200MB 이하의 PDF를 골라 주세요."); return; }
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const { PDFDocument } = await import("pdf-lib");
@@ -101,7 +128,7 @@ export function PdfResizeTool() {
         background: noBackground ? null : background,
         pages: pageRange.trim() ? parsePageRange(pageRange, source.pageCount) : undefined,
       });
-      const url = URL.createObjectURL(new Blob([converted.bytes.slice()], { type: "application/pdf" }));
+      const url = URL.createObjectURL(new Blob([converted.bytes as Uint8Array<ArrayBuffer>], { type: "application/pdf" }));
       setResult({ ...converted, url, bleedMm: b, fileName: `${source.name.replace(/\.pdf$/i, "")}_${w}x${h}${b ? `_도련${b}` : ""}.pdf` });
       setMessage(`${converted.pages.length}/${converted.pageCount}쪽을 바꿨어요.`);
     } catch (e) { setResult(null); setMessage(e instanceof Error ? e.message : "바꾸지 못했어요."); }

@@ -1,9 +1,14 @@
-// Changes PDF page sizes without redrawing anything. Each page keeps its original content streams,
-// images (byte-identical, no recompression) and fonts; it only gains a wrapping `q … cm … Q` and new
-// Media/Crop/Bleed/Trim boxes. Runs the same in the browser and in Node (pdf-lib only).
-import { PDFArray, PDFDocument, PDFName, PDFNumber, degrees, type PDFPage } from "pdf-lib";
+// Changes PDF page sizes without redrawing anything. Each page's drawing moves into a Form XObject that
+// shares the page's resources (images byte-identical, no recompression; fonts and vectors untouched) and is
+// placed with one transform; the page gets new Media/Crop/Bleed/Trim boxes. A form, unlike wrapping the page
+// content in `q … cm … Q`, also carries patterns and shadings along, since those are anchored to the space
+// their content stream starts in. Runs the same in the browser and in Node (pdf-lib only).
+import { PDFArray, PDFContentStream, PDFDocument, PDFName, PDFNumber, PDFRawStream, PDFRef, decodePDFRawStream, degrees, type PDFPage } from "pdf-lib";
 
 const PT_PER_MM = 72 / 25.4;
+/** Extra `q` levels around the original drawing absorb stray `Q`s from broken producers. */
+const Q_GUARD = 4;
+const FORM_NAME = "WiggleResizedPage";
 
 /** fit: whole trim visible, uniform scale. fill: no gaps, uniform scale, edges cut. stretch: separate x/y scale. */
 export type PdfResizeMode = "fit" | "fill" | "stretch";
@@ -84,13 +89,45 @@ export async function resizePdf(input: Uint8Array | ArrayBuffer, options: PdfRes
 
   const W = widthMm * PT_PER_MM, H = heightMm * PT_PER_MM, B = bleedMm * PT_PER_MM;
   const reports: PdfResizePageReport[] = [];
+  const replaced: PDFRef[] = [], kept = new Set<PDFRef>();
   for (const [index, page] of all.entries()) {
-    if (selected.has(index + 1)) reports.push(resizePage(pdf, page, index + 1, { W, H, B, mode, placeInto, sourceBleed, fill }));
+    if (selected.has(index + 1)) reports.push(resizePage(pdf, page, index + 1, { W, H, B, mode, placeInto, sourceBleed, fill }, replaced));
+    else contentRefs(pdf, page).forEach((ref) => kept.add(ref));
   }
+  // The old content streams now live inside the forms; drop the originals unless an untouched page still uses them.
+  for (const ref of replaced) if (!kept.has(ref)) pdf.context.delete(ref);
   return { bytes: await pdf.save(), pageCount: all.length, pages: reports };
 }
 
-function resizePage(pdf: PDFDocument, page: PDFPage, pageNumber: number, o: { W: number; H: number; B: number; mode: PdfResizeMode; placeInto: "trim" | "bleed"; sourceBleed: "keep" | "clip"; fill: string }): PdfResizePageReport {
+function contentRefs(pdf: PDFDocument, page: PDFPage) {
+  const value = page.node.get(PDFName.of("Contents"));
+  const refs = value instanceof PDFRef ? [value] : [];
+  const contents = value ? pdf.context.lookup(value) : undefined;
+  if (contents instanceof PDFArray) refs.push(...contents.asArray().filter((item): item is PDFRef => item instanceof PDFRef));
+  return refs;
+}
+
+/** The page's drawing as one decoded stream. Contents may be one stream, an array of them, or missing. */
+function decodedContents(pdf: PDFDocument, page: PDFPage, pageNumber: number) {
+  const value = page.node.get(PDFName.of("Contents"));
+  const contents = value ? pdf.context.lookup(value) : undefined;
+  const streams = contents instanceof PDFArray ? contents.asArray().map((item) => pdf.context.lookup(item)) : contents ? [contents] : [];
+  const parts = streams.map((stream) => {
+    try {
+      if (stream instanceof PDFRawStream) return decodePDFRawStream(stream).decode();
+      if (stream instanceof PDFContentStream) return stream.getUnencodedContents();
+    } catch { /* falls through to the error below */ }
+    throw new Error(`${pageNumber}쪽의 그림 정보를 풀지 못했어요. 다른 프로그램에서 PDF로 다시 저장해 주세요.`);
+  });
+  const guardStart = new TextEncoder().encode(`${"q ".repeat(Q_GUARD)}\n`), guardEnd = new TextEncoder().encode(`\n${"Q ".repeat(Q_GUARD)}\n`);
+  const chunks = [guardStart, ...parts.flatMap((part) => [part, Uint8Array.of(10)]), guardEnd];
+  const joined = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+  let offset = 0;
+  for (const chunk of chunks) { joined.set(chunk, offset); offset += chunk.length; }
+  return joined;
+}
+
+function resizePage(pdf: PDFDocument, page: PDFPage, pageNumber: number, o: { W: number; H: number; B: number; mode: PdfResizeMode; placeInto: "trim" | "bleed"; sourceBleed: "keep" | "clip"; fill: string }, replaced: PDFRef[]): PdfResizePageReport {
   const { W, H, B } = o, MW = W + 2 * B, MH = H + 2 * B;
   const unitValue = page.node.get(PDFName.of("UserUnit"));
   const unit = unitValue instanceof PDFNumber ? unitValue.asNumber() : 1;
@@ -109,10 +146,15 @@ function resizePage(pdf: PDFDocument, page: PDFPage, pageNumber: number, o: { W:
   const rotate: Record<number, Matrix> = { 0: [1, 0, 0, 1, 0, 0], 90: [0, -1, 1, 0, 0, trim.width], 180: [-1, 0, 0, -1, trim.width, trim.height], 270: [0, 1, -1, 0, trim.height, 0] };
   const matrix = multiply([sx, 0, 0, sy, ox, oy], multiply(rotate[rotation], [1, 0, 0, 1, -trim.x, -trim.y]));
   const clip = o.sourceBleed === "clip" ? trim : crop;
+  // The form clips to its BBox (source crop or trim box) and shares the page's resources (possibly inherited).
+  const resources = page.node.getInheritableAttribute(PDFName.of("Resources")) ?? pdf.context.obj({});
+  const form = pdf.context.register(pdf.context.flateStream(decodedContents(pdf, page, pageNumber), {
+    Type: "XObject", Subtype: "Form", FormType: 1, BBox: [clip.x, clip.y, clip.x + clip.width, clip.y + clip.height], Resources: resources,
+  }));
+  replaced.push(...contentRefs(pdf, page));
   const backdrop = o.fill ? `q ${o.fill} rg 0 0 ${num(MW)} ${num(MH)} re f Q\n` : "";
-  const start = pdf.context.flateStream(`${backdrop}q ${matrix.map(num).join(" ")} cm ${[clip.x, clip.y, clip.width, clip.height].map(num).join(" ")} re W n\n`);
-  const end = pdf.context.flateStream("\nQ\n");
-  page.node.wrapContentStreams(pdf.context.register(start), pdf.context.register(end));
+  page.node.set(PDFName.of("Contents"), pdf.context.register(pdf.context.flateStream(`${backdrop}q ${matrix.map(num).join(" ")} cm /${FORM_NAME} Do Q\n`)));
+  page.node.set(PDFName.of("Resources"), pdf.context.obj({ XObject: { [FORM_NAME]: form } }));
 
   const annots = page.node.Annots();
   page.node.delete(PDFName.of("Annots"));
