@@ -237,6 +237,10 @@ test("책 넘기기: 앞표지 홀로(오른쪽) → 2–3쪽, 4–5쪽 … 두 
   assert.deepEqual(bookSpreads(document).map(spread => spread.label), ["앞표지", "2–3쪽", "4–5쪽", "6쪽", "뒷표지"]);
   const even = book(6); even.pages[5] = applyStorybookTemplate(even.pages[5], "back", () => makeId("element"));
   assert.deepEqual(bookSpreads(even).map(({ left, right }) => [left, right]), [[null, 0], [1, 2], [3, 4], [5, null]]);
+  // 마지막 쪽에 뒷표지 표시가 없어도 읽을 때는 실제 책처럼 마지막 쪽이 뒷표지로 홀로 보인다.
+  assert.deepEqual(bookSpreads(book(6)).map(({ left, right, kind }) => [left, right, kind]), [[null, 0, "front"], [1, 2, "inner"], [3, 4, "inner"], [5, null, "back"]]);
+  assert.deepEqual(bookSpreads(book(26)).map(spread => spread.label).slice(-2), ["24–25쪽", "뒷표지"]);
+  assert.deepEqual(bookSpreads(book(1)).map(({ left, right, kind }) => [left, right, kind]), [[null, 0, "front"]]);
 });
 
 test("ebook order: front cover alone, pairs or single pages, back cover alone", () => {

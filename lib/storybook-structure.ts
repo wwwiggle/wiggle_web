@@ -305,14 +305,20 @@ export function ebookViews(document: Pick<StorybookDocument, "pages">, spread: b
 /** 펼침 한 장. null = 그 자리에 쪽이 없음(닫힌 책의 빈 쪽 또는 홀수 끝의 빈 종이). */
 export type BookSpread = { left: number | null; right: number | null; label: string; kind: "front" | "inner" | "back" };
 
+/**
+ * 읽기 화면의 펼침 순서. 실제 책처럼 맨 앞 쪽은 앞표지, 맨 뒤 쪽은 뒷표지로 각각 홀로 보인다.
+ * 2026-11-02 사용자 지시: 마지막 쪽이 "back" 틀로 표시되지 않은 옛 책도 읽을 때는 마지막 쪽을 뒷표지로 본다
+ * (인쇄·주문 쪽 규칙인 hasBackCover는 그대로 둔다).
+ */
 export function bookSpreads(document: Pick<StorybookDocument, "pages">): BookSpread[] {
   const spreads: BookSpread[] = [{ left: null, right: 0, label: "앞표지", kind: "front" }];
-  const inner = innerPageIndexes(document);
+  const count = document.pages.length;
+  const back = count > 1 ? count - 1 : null;
+  const inner = Array.from({ length: Math.max(0, count - 2) }, (_, index) => index + 1);
   for (let i = 0; i < inner.length; i += 2) {
     const left = inner[i], right = inner[i + 1] ?? null;
     spreads.push({ left, right, label: right === null ? `${left + 1}쪽` : `${left + 1}–${right + 1}쪽`, kind: "inner" });
   }
-  const back = backCoverIndex(document);
   if (back !== null) spreads.push({ left: back, right: null, label: "뒷표지", kind: "back" });
   return spreads;
 }
