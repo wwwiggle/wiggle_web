@@ -1,5 +1,29 @@
 # Wiggle Web 현재 상태
 
+## 2026-11-02 PDF 판형 바꾸기 시험 기능 (`claude/pdf-resize`, 로컬 검증, 제품 미연결)
+
+사용자 요청: "210*210 사이즈를 243*248 사이즈로 이미지 화질이나 품질 변화 없이 … 어떤 사이즈의 pdf로 들어오든 선택하는 사이즈로 변환되는 기능", 큰 판형을 작게 줄이는 것도 자르지 않고. 사용자가 검토 보고(가능 조건·비율 선택지·PaperKnife·PDF24 비교)를 받고 "네, 진행해"로 시험 개발을 승인했다. 사용자가 시험한 뒤 제품 반영을 정한다.
+
+- `lib/pdf-resize.ts` `resizePdf(bytes, { widthMm, heightMm, bleedMm, mode, placeInto, sourceBleed, background, pages })`
+  - 쪽을 다시 그리지 않는다. 원래 내용 앞뒤에 `q <행렬> cm <잘라낼 상자> re W n … Q`만 덧붙이고 Media·Crop·Bleed·TrimBox를 새로 쓴다. 이미지 스트림·글꼴·벡터·투명도 그룹·CMYK는 그대로다(pdf-lib만, 새 의존성 없음). `embedPage`는 /Group을 버리고 MediaBox 원점을 무시해서 쓰지 않았다.
+  - 방식: `fit`(자르지 않음, 빈칸), `fill`(빈칸 없음, 잘림), `stretch`(가로·세로 따로). `placeInto`: 원본 재단 상자를 새 재단선(`trim`) 또는 도련 끝(`bleed`)에 맞춘다. `sourceBleed`: 원본 도련 그림을 빈칸에 살리기(`keep`) 또는 원본 재단선에서 자르기(`clip`).
+  - /Rotate는 행렬에 넣고 0으로 바꾼다. UserUnit·ArtBox·주석(링크·입력칸)은 지운다. 암호 PDF는 거절한다.
+  - 쪽마다 배율, 그림 크기, 재단으로 잘리는 원본(mm), 재단 안 빈칸(mm)을 돌려준다.
+- 시험 방법 두 가지
+  - 명령: `node scripts/resize-pdf.mjs 입력.pdf 출력.pdf --size 243x248 --bleed 3 --mode fill --into bleed` 또는 `--preset sweetbook`. `--pages 1-3`, `--background none`, `--source-bleed clip`.
+  - 화면: `/tools/pdf-resize`. 브라우저 안에서만 처리하고 서버로 보내지 않는다. 링크 없음, `noindex`, 로그인 없음. 판형 고정본(스위트북 243×248+3, 210×210, A4, A5)과 직접 입력, 원본·결과 미리보기(분홍 점선 = 재단선), 쪽별 표, 내려받기.
+- 실측
+  - 210×210 3쪽(300ppi RGB·CMYK JPEG, 알파 PNG, 벡터, 한글 글꼴) → 243×248+3 채우기(도련 끝): 249×254, 이미지 4개 SHA-256 동일, 글자 추출 동일, `validatePrintPdf(inner)` 통과, 용량 +1KB 안팎. 배율 1.2095, 재단으로 잘리는 원본 좌우 4.55mm·위아래 2.48mm.
+  - 앱이 만든 24쪽 인쇄 내지(249×254) → 210×210 맞춤: 배율 0.8468, 잘림 없음, 좌우 빈칸 2.12mm는 원본 도련 그림으로 채워짐. 210×210+3 → 다시 243×248+3도 이미지 동일. 피드백 PDF(A4 2쪽, 한글) → 210×210도 이미지·글자 동일.
+  - 회전 0·90·180·270과 원점이 어긋난 Crop/TrimBox: 같은 크기로 바꾼 렌더가 원본과 픽셀까지 같음.
+- 검증: `tests/pdf-resize.test.mjs` 5개. `scripts/check-pdf-resize-browser.mjs`: 실제 Chrome 320×568·390×844·844×390에서 파일 선택 → 변환 → 미리보기 2장 → 내려받은 PDF 쪽 크기, 가로 넘침 없음, 44px 미만 터치 목표 없음, 라디오·색 칸 실제 너비, 쪽 범위 오류 안내와 복구. 첫 캡처에서 `.book-desk input` 너비 100% 규칙이 라디오를 늘린 것을 찾아 고쳤다.
+  - typecheck 통과. lint 오류 0(기존 경고 14). `npm test` 475개 중 473 통과·실패 0. `npm run test:postgres` 466개 중 실패 5 — 같은 5개(명단 코드 다시 뽑기, 학급 만들기 학교·학년, 학급 상태·재입장, 손들기, 오늘 수업)가 손대지 않은 `origin/main`(`00a49f9`)에서도 똑같이 실패해서 이 변경과 무관하다(따로 고칠 일).
+- 남은 위험
+  - Canva·InDesign 등 외부 도구로 만든 실제 PDF는 시험하지 않았다. q/Q 짝이 맞지 않는 내용 스트림은 이론상 감싼 행렬이 풀릴 수 있다.
+  - 확대하면 사진의 실제 해상도가 배율만큼 낮아진다(300ppi → ×1.21이면 248ppi). 다시 샘플링하지는 않는다.
+  - 표지(책등이 있는 펼침면)는 다루지 않는다. 원본보다 도련이 넓게 필요하면(예: 줄이면서 도련 3mm) 도련 바깥쪽 일부가 배경색이 될 수 있다. 미리보기 점선으로 확인한다.
+  - `/tools/pdf-resize`는 공개 경로다(서버로 보내는 것 없음). 제품에 넣을 자리는 `pending-decisions.md`에 있다.
+
 ## 2026-11-02 그림 잠금 확대·면지 없앰·내지 24쪽·ebook 서재·속도 (`claude/paid-lock-ebook-shelf`)
 
 결정과 이유는 `product-decisions.md` 「2026-11-02 그림 유료 잠금 확대…」에 있다.

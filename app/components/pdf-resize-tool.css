@@ -1,0 +1,26 @@
+/* PDF 판형 바꾸기 시험 화면(2026-11-02). 기본 틀은 book-workflow.css를 그대로 쓴다. */
+.pdf-resize-tool{max-width:960px;margin:0 auto;padding:32px 20px 60px}
+.pdf-resize-tool h1{font-size:28px;margin:4px 0 8px;letter-spacing:-.8px}
+.pdf-resize-tool input:not([type=radio]):not([type=checkbox]):not([type=file]):not([type=color]),.pdf-resize-tool select{min-height:44px;padding:0 12px;border:1px solid #c5d1c5;border-radius:10px;font:inherit;width:100%;min-width:0;background:#fff}
+.pdf-resize-tool input[type=file]{min-height:44px;max-width:100%}
+/* book-desk의 input 너비 100% 규칙(.book-desk input:not(...))보다 구체적으로 써서 색·라디오 칸을 작게 둔다. */
+.book-desk.pdf-resize-tool input[type=color]{width:64px;height:44px;min-height:44px;padding:2px;border:1px solid #c5d1c5;border-radius:10px;background:#fff}
+.pdf-resize-sizes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 14px;align-items:end}
+.pdf-resize-inline{display:flex;align-items:center;gap:8px;min-height:44px;margin:12px 0}
+.pdf-resize-inline input[type=number]{width:84px!important}
+.pdf-resize-choice{border:0;padding:0;margin:18px 0;display:grid;gap:8px}
+.pdf-resize-choice legend{font-weight:700;font-size:14px;margin-bottom:8px}
+.pdf-resize-choice label{margin:0;display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid #e1e5e8;border-radius:12px;cursor:pointer;min-height:44px}
+.pdf-resize-choice label:has(input:checked){border-color:#426c5a;background:#f2f7f3}
+.book-desk.pdf-resize-tool .pdf-resize-choice input[type=radio]{width:18px;height:18px;min-height:0;padding:0;margin:4px 0 0;flex:0 0 18px;border:0;accent-color:#40715c}
+.pdf-resize-choice span{display:grid;gap:2px;min-width:0;flex:1}
+.pdf-resize-choice small{font-size:12px;color:#66717b;line-height:1.6}
+.pdf-resize-previews{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.pdf-resize-previews figure{margin:0;min-width:0;display:grid;gap:8px;justify-items:center;align-content:start}
+.pdf-resize-previews canvas{max-width:100%;height:auto;max-height:420px;object-fit:contain;box-shadow:0 0 0 1px #c9d0d4,0 6px 16px #24342c14;background:#fff}
+.pdf-resize-previews figcaption{font-size:13px;color:#66717b}
+.pdf-resize-empty{width:100%;aspect-ratio:1;display:grid;place-items:center;text-align:center;padding:16px;border:1px dashed #c9d0d4;border-radius:12px;font-size:13px;color:#66717b}
+.pdf-resize-table{overflow-x:auto;margin:12px 0}
+.pdf-resize-table table{border-collapse:collapse;width:100%;font-size:13px;min-width:620px}
+.pdf-resize-table th,.pdf-resize-table td{border-top:1px solid #e5e8ea;padding:8px 6px;text-align:left;vertical-align:top}
+@media(max-width:600px){.pdf-resize-tool{padding:16px 12px 40px}.pdf-resize-sizes{grid-template-columns:1fr}.pdf-resize-previews{grid-template-columns:1fr}.pdf-resize-tool .button{width:100%}}
