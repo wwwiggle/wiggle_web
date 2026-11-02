@@ -23,7 +23,7 @@ export async function seedManyImagesBook(server, index, count = 1000) {
  const assetIds=[original.id,...Array.from({length:count-1},(_,i)=>`asset_many_${index}_${String(i).padStart(8,'0')}`)];
  await server.DB.batch(assetIds.slice(1).map(assetId=>server.DB.prepare("INSERT INTO storybook_assets(id,storybook_id,student_id,source_type,object_key,content_type,byte_size) VALUES(?,?,?,'upload',?,'image/png',?)").bind(assetId,id,student,objectKey,png.length)));
  const document=emptyStorybookDocument();
- document.pages=Array.from({length:24},(_,i)=>emptyStorybookDocument('squarebook-hc',`page_many_${index}_${String(i).padStart(8,'0')}`,`element_text_${index}_${String(i).padStart(8,'0')}`).pages[0]);
+ document.pages=Array.from({length:25},(_,i)=>emptyStorybookDocument('squarebook-hc',`page_many_${index}_${String(i).padStart(8,'0')}`,`element_text_${index}_${String(i).padStart(8,'0')}`).pages[0]);
  assetIds.forEach((assetId,i)=>document.pages[Math.floor(i/200)].elements.push({
   id:`element_many_${index}_${String(i).padStart(8,'0')}`,type:'image',assetId,
   x:Number((.02+(i%20)*.048).toFixed(4)),y:Number((.25+(Math.floor(i/20)%10)*.065).toFixed(4)),width:.04,height:.055,

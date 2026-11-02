@@ -4,6 +4,7 @@ import {
   applyStorybookTemplate,
   DEFAULT_STORYBOOK_TEXT,
   MAX_STORYBOOK_PAGES,
+  MIN_STORYBOOK_INNER_PAGES,
   STORYBOOK_TEMPLATE_LABELS,
   type StorybookDocument,
   type StorybookElement,
@@ -37,7 +38,7 @@ export function pageLabel(document: Pick<StorybookDocument, "pages">, index: num
   if (role === "front") return "앞표지";
   if (role === "back") return "뒷표지";
   const template = document.pages[index]?.template;
-  if (template === "pattern") return "면지";
+  if (template === "pattern") return "패턴 면지";
   if (template === "title" || template === "author") return STORYBOOK_TEMPLATE_LABELS[template];
   return `${index + 1}쪽`;
 }
@@ -87,21 +88,56 @@ function structurePage(template: StorybookTemplate, makeId: MakeId, context: Str
   return applyStorybookTemplate(page, template, () => makeId("element"), context);
 }
 
-/** 책의 뼈대가 되는 쪽(앞표지·면지·작가의 말·속표지·뒷표지). 지우거나 복제하지 않는다. */
+/**
+ * 책의 뼈대가 되는 쪽(앞표지·작가의 말·속표지·뒷표지). 지우지 않는다.
+ * 2026-11-02: 면지는 뼈대에서 뺐다(사용자 지시 "면지는 없애"). 「패턴 면지 추가」로 넣은 쪽은 지울 수 있다.
+ */
 export function isStructurePage(document: Pick<StorybookDocument, "pages">, index: number) {
   const role = pageRole(document, index), template = document.pages[index]?.template;
-  return role !== "inner" || template === "pattern" || template === "author" || template === "title";
+  return role !== "inner" || template === "author" || template === "title";
+}
+
+/** 인쇄 내지(앞·뒤표지를 뺀 쪽) 최소 수. 표지 PDF는 따로, 내지 PDF는 24쪽부터 만든다(2026-11-02 사용자 결정). */
+export const MIN_INNER_PAGES = MIN_STORYBOOK_INNER_PAGES;
+export function innerPageCount(document: Pick<StorybookDocument, "pages">) {
+  return innerPageIndexes(document).length;
+}
+
+/** 이 쪽을 지울 수 있는지. 지울 수 없으면 아이에게 보여 줄 까닭을 돌려준다(빈 문자열 = 지울 수 있음). */
+export function pageDeleteBlock(document: Pick<StorybookDocument, "pages">, index: number, minInner = MIN_INNER_PAGES): string {
+  if (document.pages.length <= 1) return "쪽이 하나뿐이라 지울 수 없어요.";
+  const role = pageRole(document, index);
+  if (role === "front") return "앞표지는 책의 뼈대라 지울 수 없어요.";
+  if (role === "back") return "뒷표지는 책의 뼈대라 지울 수 없어요.";
+  const template = document.pages[index]?.template;
+  if (template === "author") return "작가의 말 쪽은 책의 뼈대라 지울 수 없어요.";
+  if (template === "title") return "속표지는 책의 뼈대라 지울 수 없어요.";
+  if (innerPageCount(document) <= minInner) return `최소 페이지가 ${minInner}페이지라서 쪽을 삭제할 수 없어요. (앞뒤 표지를 뺀 내지가 ${minInner}쪽보다 많을 때 지울 수 있어요.)`;
+  return "";
 }
 
 /**
- * 2026-11-01 사용자 결정: 책은 처음부터 「앞표지 → 면지 → 작가의 말 → 속표지 → 내지 … → 뒷표지」 꼴을 갖춘다.
+ * 쪽 복제(2026-11-02: 내지가 아니어도 언제나 복제할 수 있다).
+ * 복사본은 늘 평범한 내지가 된다 — 표지·작가의 말·속표지 복사본이 뼈대로 잡혀 못 지우는 일이 없게.
+ * 패턴 면지는 패턴 면지로 남는다. 뒷표지는 맨 끝에 남도록 복사본을 그 앞에 넣는다. 앞표지 복사본은 바로 뒤(2쪽)에 들어간다.
+ */
+export function duplicatedPage(document: Pick<StorybookDocument, "pages">, index: number, makeId: MakeId) {
+  const page = document.pages[index];
+  if (!page) return null;
+  const { template, ...rest } = page;
+  const copy: StorybookPage = { ...rest, id: makeId("page"), elements: page.elements.map(element => ({ ...element, id: makeId("element") })), ...(template === "pattern" ? { template } : {}) };
+  const at = pageRole(document, index) === "back" ? index : index + 1;
+  return { copy, at };
+}
+
+/**
+ * 2026-11-02 사용자 결정: 책은 처음부터 「앞표지 → 작가의 말 → 속표지 → 내지 … → 뒷표지」 꼴을 갖춘다(면지는 넣지 않는다).
  * 빠진 부분만 더하고, 있는 쪽은 옮기거나 고치거나 지우지 않는다.
  */
 export function completeBookStructure(document: StorybookDocument, makeId: MakeId, context: StructureContext, maxPages = MAX_STORYBOOK_PAGES) {
   const has = (template: StorybookTemplate) => document.pages.some(page => page.template === template);
   const front: StorybookPage[] = [];
   const added: string[] = [];
-  if (!has("pattern")) { front.push(structurePage("pattern", makeId, context)); added.push("면지"); }
   if (!has("author")) { front.push(structurePage("author", makeId, context)); added.push("작가의 말"); }
   if (!has("title")) { front.push(structurePage("title", makeId, context)); added.push("속표지"); }
   const needsBack = !hasBackCover(document);
@@ -115,15 +151,45 @@ export function completeBookStructure(document: StorybookDocument, makeId: MakeI
   return { document: { ...document, pages: [cover, ...front, ...pages.slice(1), backCover] }, added, error: "" };
 }
 
-/** 새 그림책: 뼈대 5쪽 + 내지로 최소 쪽 수(24쪽)를 채운다. */
-export function newStructuredStorybook(format: StorybookDocument["format"], makeId: MakeId, minPages = 24): StorybookDocument {
+/** 새 그림책: 앞표지 + 내지 24쪽(작가의 말·속표지 포함) + 뒷표지 = 26쪽. 내지 PDF가 24쪽부터라서다(2026-11-02). */
+export function newStructuredStorybook(format: StorybookDocument["format"], makeId: MakeId, minInner = MIN_INNER_PAGES): StorybookDocument {
   const context = { title: "", credit: "" };
   const cover = structurePage("cover", makeId, context);
-  const inner = Array.from({ length: Math.max(1, minPages - 5) }, () => structurePage("inner", makeId, context));
+  const inner = Array.from({ length: Math.max(1, minInner - 2) }, () => structurePage("inner", makeId, context));
   return {
     schemaVersion: 1, format,
-    pages: [cover, structurePage("pattern", makeId, context), structurePage("author", makeId, context), structurePage("title", makeId, context), ...inner, structurePage("back", makeId, context)],
+    pages: [cover, structurePage("author", makeId, context), structurePage("title", makeId, context), ...inner, structurePage("back", makeId, context)],
   };
+}
+
+/** 아무것도 놓지 않은 면지(그림·글·배경 그림이 없는 패턴 쪽). 지워도 잃는 것이 없다. */
+export function isEmptyEndpaper(page: StorybookPage) {
+  return page.template === "pattern" && !page.backgroundAssetId && page.elements.length === 0;
+}
+
+/**
+ * 만드는 중인 책을 열 때(2026-11-02):
+ * - 11-01 뼈대 때 자동으로 들어간 **빈** 면지를 뺀다(그림을 놓은 면지는 그대로 둔다 — 아이 작업은 지우지 않는다).
+ * - 내지가 24쪽보다 적으면 뒷표지 앞에 빈 내지를 더해 24쪽을 채운다. 있는 쪽은 고치지 않는다.
+ */
+export function settleInnerPages(document: StorybookDocument, makeId: MakeId, minInner = MIN_INNER_PAGES, maxPages = MAX_STORYBOOK_PAGES) {
+  const removed = document.pages.filter((page, index) => index > 0 && isEmptyEndpaper(page)).length;
+  let pages = removed ? document.pages.filter((page, index) => index === 0 || !isEmptyEndpaper(page)) : document.pages;
+  const current = innerPageIndexes({ pages }).length;
+  const room = Math.max(0, maxPages - pages.length);
+  const added = Math.min(room, Math.max(0, minInner - current));
+  if (added) {
+    const at = newPageIndex({ pages });
+    const blanks = Array.from({ length: added }, () => structurePage("inner", makeId, { title: "", credit: "" }));
+    pages = [...pages.slice(0, at), ...blanks, ...pages.slice(at)];
+  }
+  return { document: removed || added ? { ...document, pages } : document, removed, added };
+}
+
+/** 「패턴 면지 추가」: 앞표지 바로 뒤에 패턴 면지 쪽을 하나 넣는다. */
+export function insertPatternPage(document: StorybookDocument, elements: StorybookElement[], makeId: MakeId) {
+  const page: StorybookPage = { id: makeId("page"), background: "#FFF6E3", template: "pattern", elements };
+  return { document: { ...document, pages: [document.pages[0], page, ...document.pages.slice(1)] }, index: 1 };
 }
 
 export type PatternDensity = "few" | "normal" | "many";
@@ -188,20 +254,21 @@ export function patternElements(options: { assetId: string; imageAspect: number;
 }
 
 /**
- * 패턴 면지(2026-11-01): 그림 한 장을 3·2·3 엇갈림으로 8장 놓는다. 그림 비율은 지키고 칸 안에 들어가게 줄인다.
- * pageAspect = 쪽 가로/세로, imageAspect = 그림 가로/세로.
+ * 패턴 면지(2026-11-02 사용자 지시): 그림 한 장을 가로 2장 × 세로 4줄로, 줄마다 반 칸씩 엇갈리게(지그재그) 8장 놓는다.
+ * 그림 비율은 지키고 칸 안에 들어가게 줄인다. pageAspect = 쪽 가로/세로, imageAspect = 그림 가로/세로.
  */
 export function patternEightElements(options: { assetId: string; imageAspect: number; pageAspect: number; makeId: () => string }): StorybookElement[] {
   const imageAspect = Math.min(10, Math.max(0.1, Number.isFinite(options.imageAspect) ? options.imageAspect : 1));
-  const cell = 1 / 3, box = cell * 0.78;
-  // box는 쪽 너비·높이에 대한 비율이다. 그림 비율에 맞춰 가로·세로 중 긴 쪽을 box에 맞춘다.
+  // 줄 간격 0.2, 같은 줄 두 장 간격 0.4, 엇갈린 이웃 간격 0.2 → 그림 상자가 0.18 안쪽이면 서로 겹치지 않는다.
+  const box = 0.18;
   let width = box, height = width * options.pageAspect / imageAspect;
   if (height > box) { height = box; width = height * imageAspect / options.pageAspect; }
-  const rows: number[][] = [[1, 3, 5], [2, 4], [1, 3, 5]];
-  return rows.flatMap((columns, row) => columns.map((column, index) => ({
+  const columns = [[0.2, 0.6], [0.4, 0.8]];
+  const rowCenters = [0.2, 0.4, 0.6, 0.8];
+  return rowCenters.flatMap((centerY, row) => columns[row % 2].map((centerX, index) => ({
     id: options.makeId(), type: "image" as const, assetId: options.assetId,
-    x: round4(column / 6 - width / 2), y: round4((row + 0.5) * cell - height / 2), width: round4(width), height: round4(height),
-    rotation: 0, zIndex: row * 3 + index + 1, opacity: 1, locked: false, aspectRatio: round4(imageAspect),
+    x: round4(centerX - width / 2), y: round4(centerY - height / 2), width: round4(width), height: round4(height),
+    rotation: 0, zIndex: row * 2 + index + 1, opacity: 1, locked: false, aspectRatio: round4(imageAspect),
   })));
 }
 
@@ -220,7 +287,10 @@ export function applyPattern(page: StorybookPage, elements: StorybookElement[], 
 export const BARCODE_AREA = { x: 0.6, y: 0.79, width: 0.32, height: 0.15 } as const;
 
 export type EbookView = { pages: number[]; label: string };
-/** ebook order: front cover alone, then pages in pairs (or one at a time on narrow screens), then the back cover alone. */
+/**
+ * ebook order: front cover alone, then pages in pairs, then the back cover alone.
+ * 2026-11-02: 읽기 화면은 화면 폭과 상관없이 언제나 두 쪽씩 펼친다(실제 책처럼). spread=false는 옛 호출부 호환용.
+ */
 export function ebookViews(document: Pick<StorybookDocument, "pages">, spread: boolean): EbookView[] {
   const back = backCoverIndex(document);
   const inner = innerPageIndexes(document);
@@ -229,4 +299,26 @@ export function ebookViews(document: Pick<StorybookDocument, "pages">, spread: b
   else for (const index of inner) views.push({ pages: [index], label: `${index + 1}쪽` });
   if (back !== null) views.push({ pages: [back], label: "뒷표지" });
   return views;
+}
+
+/* 두 쪽 펼침 책 넘기기(app/components/BookFlip.tsx, 2026-11-02) */
+/** 펼침 한 장. null = 그 자리에 쪽이 없음(닫힌 책의 빈 쪽 또는 홀수 끝의 빈 종이). */
+export type BookSpread = { left: number | null; right: number | null; label: string; kind: "front" | "inner" | "back" };
+
+export function bookSpreads(document: Pick<StorybookDocument, "pages">): BookSpread[] {
+  const spreads: BookSpread[] = [{ left: null, right: 0, label: "앞표지", kind: "front" }];
+  const inner = innerPageIndexes(document);
+  for (let i = 0; i < inner.length; i += 2) {
+    const left = inner[i], right = inner[i + 1] ?? null;
+    spreads.push({ left, right, label: right === null ? `${left + 1}쪽` : `${left + 1}–${right + 1}쪽`, kind: "inner" });
+  }
+  const back = backCoverIndex(document);
+  if (back !== null) spreads.push({ left: back, right: null, label: "뒷표지", kind: "back" });
+  return spreads;
+}
+
+/** 이 쪽이 들어 있는 펼침 번호. */
+export function spreadOfPage(spreads: BookSpread[], page: number) {
+  const found = spreads.findIndex(spread => spread.left === page || spread.right === page);
+  return found < 0 ? 0 : found;
 }

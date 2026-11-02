@@ -24,7 +24,7 @@ test("그림책 API는 학생 소유권·요청 출처·저장 충돌을 확인�
   assert.match(book, /storybook_mutations/);
   assert.match(book, /다른 그림책의 이미지는 사용할 수 없어요/);
   assert.match(book, /backgroundAssetId/);
-  assert.match(assets, /PNG 이미지가 아니거나 파일이 너무 커요/);
+  assert.match(assets, /PNG·JPEG 이미지가 아니거나 파일이 너무 커요/);
   assert.match(assets, /ARTWORKS\.put/);
   assert.match(assets, /ARTWORKS\.delete/);
   assert.match(assetImage, /JOIN storybooks/);
@@ -111,7 +111,9 @@ test("학생 화면에 실제 그림책 진입·편집·가져오기·미리보�
   assert.match(editor, /🖼️ 새 그림/);
   assert.match(editor, /🌄 배경 넣기/);
   assert.match(editor, /배경 지우기/);
-  assert.match(editor, /🔁 패턴 면지/);
+  assert.match(editor, /🔁 패턴 면지 추가/);
+  // 2026-11-02: 「이야기 칸 추가」는 같은 자리에 글 칸을 하나 더 겹쳐 놓을 뿐이라 뺐다(쪽마다 이야기 칸이 이미 있다).
+  assert.doesNotMatch(editor, /이야기 칸 추가/);
   assert.match(editor, /onDrop=\{\(event\) => \{ event\.preventDefault\(\); setDropActive\(false\); const file = droppedImage\(event\)/, "쪽 위로 그림을 끌어다 놓을 수 있다");
   assert.match(editor, /<header className="storybook-editor-header">.*📖 표지 펼쳐 보기.*<\/header>/, "표지 펼쳐 보기는 맨 위에 있다");
   assert.doesNotMatch(editor, /changeFormat|storybook-format-switcher|storybook-inspector-formats/);
@@ -126,10 +128,12 @@ test("학생 화면에 실제 그림책 진입·편집·가져오기·미리보�
   assert.match(editor, /visibleContentBounds/);
   assert.match(editor, /imageCropStyle/);
   assert.match(editor, /STORYBOOK_IMAGE_AREA/);
-  assert.match(editor, /STORYBOOK_TEXT_BOX/);
+  // STORYBOOK_TEXT_BOX는 「이야기 칸 추가」에서만 쓰였다(2026-11-02 제거). 쪽마다 있는 이야기 칸은 모델이 만든다.
   assert.match(editor, /배경 지우기/);
   assert.match(editor, /body: blob/);
-  assert.match(editor, /"content-type": "image\/png"/);
+  // 2026-11-02: 투명한 곳이 없는 그림은 JPEG, 투명한 그림은 PNG로 올린다(blob.type).
+  assert.match(editor, /"content-type": blob\.type/);
+  assert.match(editor, /image\/jpeg/);
   assert.match(cutout, /배경 자동 지우기/);
   assert.match(cutout, /removeConnectedColor/);
   assert.match(cutout, /opaqueBounds/);
@@ -143,7 +147,9 @@ test("학생 화면에 실제 그림책 진입·편집·가져오기·미리보�
   assert.match(editor, /useResizeObserver/);
   assert.match(editor, /useMutationObserver/);
   assert.match(editor, /controlPadding=\{8\}/);
-  assert.match(editor, /canvas\.toDataURL\("image\/png"\)/);
+  // 2026-11-02: 화면을 멈추지 않는 canvas.toBlob으로 PNG(투명)·JPEG(사진)를 만든다.
+  assert.match(editor, /canvasBlob\(canvas, "image\/png"\)/);
+  assert.match(editor, /canvasBlob\(canvas, "image\/jpeg", 0\.9\)/);
   assert.match(css, /\.storybook-stage-element\.selected/);
   assert.match(css, /\.storybook-page-background/);
   assert.match(css, /height:100%!important/);

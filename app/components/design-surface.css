@@ -331,3 +331,13 @@
   .design-surface .storybook-preview > header > div { flex-shrink: 1; }
   .design-surface .storybook-preview > header .small-button { flex: 1; min-width: 0; padding-inline: 10px; font-size: 15px; }
 }
+
+/* 2026-11-02: 「새 그림책 만들기」를 가로로 눕힌 알약 단추로 — 큰 세로 알약이 아래 칸에 붙어 보이던 것 고침.
+   불러오는 동안 뜨는 상자도 위·아래 간격을 다른 칸과 맞춘다. */
+.design-student .storybook-fixed-format { display: flex; flex-wrap: wrap; gap: 14px; }
+.design-student .storybook-fixed-format button { min-height: 76px; width: auto; min-width: min(100%, 340px); display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 16px; row-gap: 2px; align-items: center; justify-items: start; text-align: left; padding: 14px 32px 14px 22px; }
+.design-student .storybook-fixed-format button i { grid-row: 1 / span 2; width: 40px; height: 40px; margin: 0; }
+.design-student .storybook-fixed-format button b { align-self: end; }
+.design-student .storybook-fixed-format button small { align-self: start; }
+.design-student .storybook-new-book > [role="status"] { margin: 10px 0 0; font-weight: 700; color: var(--primary-dark); }
+.design-student .storybook-library > .loading-card { margin-top: 32px; }

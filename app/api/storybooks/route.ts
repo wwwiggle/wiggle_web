@@ -1,5 +1,5 @@
 import { bindings } from "@/db/runtime";
-import { DEFAULT_STORYBOOK_FORMAT, MIN_STORYBOOK_PAGES } from "@/lib/storybook-model";
+import { DEFAULT_STORYBOOK_FORMAT, MIN_STORYBOOK_INNER_PAGES } from "@/lib/storybook-model";
 import { newStructuredStorybook } from "@/lib/storybook-structure";
 import { cleanText, id, jsonError, noStoreJson, rateLimit, sameOrigin, studentFromRequest } from "@/lib/security";
 import { ownedStorybook, storybookAssets, storybookResponse } from "@/lib/storybook-store";
@@ -39,8 +39,8 @@ export async function POST(request: Request) {
   }
 
   const storybookId = id("storybook");
-  // 2026-11-01: 새 책은 처음부터 앞표지·면지·작가의 말·속표지·내지·뒷표지 꼴로 시작한다(최소 24쪽).
-  const document = newStructuredStorybook(format, (prefix) => id(prefix), MIN_STORYBOOK_PAGES);
+  // 2026-11-02: 새 책은 앞표지 · 내지 24쪽(작가의 말·속표지 포함) · 뒷표지 = 26쪽으로 시작한다. 면지는 넣지 않는다.
+  const document = newStructuredStorybook(format, (prefix) => id(prefix), MIN_STORYBOOK_INNER_PAGES);
   const assetId = artwork ? id("asset") : null;
   if (assetId) {
     document.pages[0].elements.push({

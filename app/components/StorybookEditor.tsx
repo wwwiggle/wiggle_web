@@ -11,14 +11,13 @@ import {
   storybookCompletionError,
   storybookAspectRatio,
   STORYBOOK_IMAGE_AREA,
-  STORYBOOK_TEXT_BOX,
   type StorybookDocument,
   type StorybookCrop,
   type StorybookElement,
   type StorybookFormat,
   type StorybookPage,
 } from "@/lib/storybook-model";
-import { AuthenticatedImage, AuthenticatedImageCache } from "./AuthenticatedImage";
+import { AuthenticatedImage, AuthenticatedImageCache, useSeedAuthenticatedImage } from "./AuthenticatedImage";
 import { StorybookToolbar } from "./StorybookToolbar";
 import { StorybookTextInput } from "./StorybookTextInput";
 import { StorybookReader } from "./StorybookReader";
@@ -29,12 +28,17 @@ import {
   BARCODE_AREA,
   completeBookStructure,
   coverCredit,
-  isStructurePage,
+  duplicatedPage,
+  innerPageCount,
+  insertPatternPage,
+  MIN_INNER_PAGES,
   newPageIndex,
+  pageDeleteBlock,
   pageLabel,
   pageRole,
   patternEightElements,
   replacePattern,
+  settleInnerPages,
 } from "@/lib/storybook-structure";
 import { ImageCutoutModal } from "./ImageCutoutModal";
 import { Logo } from "./Logo";
@@ -46,9 +50,6 @@ type CutoutTarget = { asset: Asset; elementId: string; pageIndex: number };
 type StageSize = { width: number; height: number };
 
 function clientId(prefix: "page" | "element") { return `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`; }
-function clonePage(page: StorybookPage): StorybookPage {
-  return { ...page, id: clientId("page"), elements: page.elements.map((element) => ({ ...element, id: clientId("element") })) };
-}
 function clamp(value: number, min: number, max: number) { return Math.max(min, Math.min(max, value)); }
 function nextZ(page: StorybookPage) { return Math.min(10_000, page.elements.reduce((max, element) => element.type === "image" ? Math.max(max, element.zIndex) : max, 0) + 1); }
 const formatAspectRatio = storybookAspectRatio;
@@ -133,23 +134,66 @@ function cropsMatch(left?: StorybookCrop, right?: StorybookCrop) {
   return (["x", "y", "width", "height"] as const).every((key) => Math.abs(left[key] - right[key]) < 0.0001);
 }
 
-async function imageFileToPng(file: File) {
+const UPLOAD_MAX_SIDE = 2048;
+const UPLOAD_MAX_BYTES = 3_500_000;
+
+function canvasBlob(canvas: HTMLCanvasElement, type: string, quality?: number) {
+  return new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("이미지를 바꾸지 못했어요.")), type, quality));
+}
+
+/** 투명한 곳이 있는지 작게 줄여 본다(전체 픽셀을 읽지 않는다). */
+function hasTransparency(source: CanvasImageSource, width: number, height: number) {
+  const scale = Math.min(1, 256 / Math.max(width, height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width * scale)); canvas.height = Math.max(1, Math.round(height * scale));
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return true;
+  context.drawImage(source, 0, 0, canvas.width, canvas.height);
+  const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  for (let index = 3; index < data.length; index += 4) if (data[index] < 250) return true;
+  return false;
+}
+
+/**
+ * 올릴 그림 만들기(2026-11-02 속도 개선).
+ * 전에는 사진도 2048px PNG로 바꿔 2~4MB를 올리고 다시 내려받았다. 이제 투명한 곳이 없으면 JPEG(보통 수백 KB)로,
+ * 투명한 그림만 PNG로 올린다. 인쇄용 2048px 크기는 그대로다. canvas.toBlob은 화면을 멈추지 않는다.
+ */
+async function imageFileToUpload(file: File) {
   if (!file.type.startsWith("image/")) throw new Error("이미지 파일을 골라 주세요.");
-  const url = URL.createObjectURL(file);
+  let source: CanvasImageSource & { width: number; height: number }; let close = () => {};
   try {
-    const image = new Image();
-    image.decoding = "async";
-    image.src = url;
-    await image.decode();
-    const scale = Math.min(1, 2048 / Math.max(image.naturalWidth, image.naturalHeight));
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    source = bitmap; close = () => bitmap.close();
+  } catch {
+    const url = URL.createObjectURL(file);
+    try { const image = new Image(); image.decoding = "async"; image.src = url; await image.decode(); source = Object.assign(image, { width: image.naturalWidth, height: image.naturalHeight }); }
+    catch { throw new Error("이 그림 파일을 읽을 수 없어요. PNG나 JPG 그림으로 넣어 주세요."); }
+    finally { URL.revokeObjectURL(url); }
+  }
+  try {
+    const scale = Math.min(1, UPLOAD_MAX_SIDE / Math.max(source.width, source.height));
     const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-    const context = canvas.getContext("2d");
+    canvas.width = Math.max(1, Math.round(source.width * scale));
+    canvas.height = Math.max(1, Math.round(source.height * scale));
+    const opaque = file.type === "image/jpeg" || !hasTransparency(source, source.width, source.height);
+    const context = canvas.getContext("2d", { alpha: !opaque });
     if (!context) throw new Error("이미지를 읽을 수 없어요.");
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    return { dataUrl: canvas.toDataURL("image/png"), aspectRatio: canvas.width / canvas.height };
-  } finally { URL.revokeObjectURL(url); }
+    if (opaque) { context.fillStyle = "#FFFFFF"; context.fillRect(0, 0, canvas.width, canvas.height); }
+    context.imageSmoothingQuality = "high";
+    context.drawImage(source, 0, 0, canvas.width, canvas.height);
+    let blob = opaque ? await canvasBlob(canvas, "image/jpeg", 0.9) : await canvasBlob(canvas, "image/png");
+    // 투명한 큰 그림이 PNG 한도를 넘으면 한 번 줄여 다시 만든다.
+    if (blob.size > UPLOAD_MAX_BYTES && !opaque) {
+      const smaller = document.createElement("canvas");
+      smaller.width = Math.max(1, Math.round(canvas.width * 0.7)); smaller.height = Math.max(1, Math.round(canvas.height * 0.7));
+      smaller.getContext("2d")?.drawImage(canvas, 0, 0, smaller.width, smaller.height);
+      blob = await canvasBlob(smaller, "image/png");
+    }
+    if (blob.type === "image/jpeg" && blob.size > UPLOAD_MAX_BYTES) blob = await canvasBlob(canvas, "image/jpeg", 0.75);
+    if (blob.size > UPLOAD_MAX_BYTES) throw new Error("이미지가 너무 커요. 조금 작은 이미지를 골라 주세요.");
+    return { blob, aspectRatio: canvas.width / canvas.height };
+  } finally { close(); }
 }
 
 async function dataUrlToPngBlob(dataUrl: string) {
@@ -182,6 +226,10 @@ function StorybookEditorContent({ teacherBookId, classroomId }: { teacherBookId?
   const [addingAsset, setAddingAsset] = useState(false);
   const assetBusyRef = useRef(false);
   const [assetNotice, setAssetNotice] = useState("");
+  // 쪽 삭제·복제를 못 할 때 까닭을 잠깐 보여 준다(2026-11-02).
+  const [pageNotice, setPageNotice] = useState("");
+  const pageNoticeTimer = useRef<number | undefined>(undefined);
+  const seedImage = useSeedAuthenticatedImage();
   const [textNotice, setTextNotice] = useState<{ pageId: string; elementId: string } | null>(null);
   const [keepImageRatio, setKeepImageRatio] = useState(true);
   const [cutoutTarget, setCutoutTarget] = useState<CutoutTarget | null>(null);
@@ -236,6 +284,9 @@ function StorybookEditorContent({ teacherBookId, classroomId }: { teacherBookId?
       if (!teacherBookId && data.storybook.status === "draft") {
         const result = completeBookStructure(normalizedDocument, prefix => clientId(prefix), { title: data.storybook.title, credit: coverCredit(normalizedDocument) });
         if (!result.error && result.added.length) { normalizedDocument = result.document; structureSaveRef.current = true; }
+        // 2026-11-02: 빈 면지는 빼고, 내지가 24쪽보다 적으면 빈 내지를 더한다(그림을 놓은 쪽은 그대로).
+        const settled = settleInnerPages(normalizedDocument, prefix => clientId(prefix));
+        if (settled.removed || settled.added) { normalizedDocument = settled.document; structureSaveRef.current = true; }
       }
       const normalizedBook = { ...data.storybook, document: normalizedDocument };
       setBook(normalizedBook); setDocument(normalizedDocument); setAssets(data.assets ?? []);
@@ -251,7 +302,7 @@ function StorybookEditorContent({ teacherBookId, classroomId }: { teacherBookId?
   useEffect(() => { bookRef.current = book; }, [book]);
   useEffect(() => { documentRef.current = document; }, [document]);
   useEffect(() => { setSelectedId(null); setSelectedTextId(null); setTextNotice(null); }, [pageIndex]);
-  useEffect(() => () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); if (maxSaveTimer.current) window.clearTimeout(maxSaveTimer.current); }, []);
+  useEffect(() => () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); if (maxSaveTimer.current) window.clearTimeout(maxSaveTimer.current); if (pageNoticeTimer.current) window.clearTimeout(pageNoticeTimer.current); }, []);
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -319,7 +370,7 @@ function StorybookEditorContent({ teacherBookId, classroomId }: { teacherBookId?
     const currentBook = bookRef.current; const currentDocument = documentRef.current;
     if (!currentBook || !currentDocument) return;
     if (complete) {
-      const message = storybookCompletionError(currentBook.title, currentDocument.pages.length, !teacherBookId);
+      const message = storybookCompletionError(currentBook.title, innerPageCount(currentDocument), !teacherBookId);
       if (message) { completionPending.current = false; setError(message); window.alert(message); return; }
       completionPending.current = true;
     }
@@ -383,13 +434,6 @@ function StorybookEditorContent({ teacherBookId, classroomId }: { teacherBookId?
     updateElement(activeText.id, patch);
   }
 
-  function addText() {
-    if (!page) return;
-    const element = { ...createStorybookTextElement(clientId("element")), ...STORYBOOK_TEXT_BOX, verticalAlign: "middle" as const, fontSize: .035 };
-    changeDocument(current => ({ ...current, pages: current.pages.map((value, index) => index === pageIndex ? { ...value, elements: [...value.elements, element] } : value) }));
-    setSelectedId(null); setSelectedTextId(element.id);
-  }
-
   function addImageElement(asset: Asset, aspectRatio?: number, targetPageId = page?.id) {
     const currentDocument = documentRef.current;
     const targetPage = currentDocument?.pages.find(value => value.id === targetPageId);
@@ -402,16 +446,21 @@ function StorybookEditorContent({ teacherBookId, classroomId }: { teacherBookId?
     setImageToolsOpen(true);
   }
 
-  async function uploadPngAsset(dataUrl: string, fallbackMessage: string) {
-    const blob = await dataUrlToPngBlob(dataUrl);
+  async function uploadImageBlob(blob: Blob, fallbackMessage: string) {
     const response = await storybookEditorFetch(`${apiBase}/${encodeURIComponent(params.id)}/assets`, {
       method: "POST",
-      headers: { "content-type": "image/png" },
+      headers: { "content-type": blob.type },
       body: blob,
     });
     const data = await response.json() as { asset?: Asset; error?: string };
     if (!response.ok || !data.asset) throw new Error(data.error ?? fallbackMessage);
+    // 방금 올린 그림을 서버에서 다시 내려받지 않고 바로 보여 준다.
+    seedImage(`${apiBase}/${params.id}/assets/${data.asset.id}`, blob);
     return data.asset;
+  }
+
+  async function uploadPngAsset(dataUrl: string, fallbackMessage: string) {
+    return uploadImageBlob(await dataUrlToPngBlob(dataUrl), fallbackMessage);
   }
 
   async function uploadFile(file: File | (() => Promise<File>) | undefined, purpose: "element" | "background" | "pattern") {
@@ -420,8 +469,8 @@ function StorybookEditorContent({ teacherBookId, classroomId }: { teacherBookId?
     assetBusyRef.current = true;
     setAddingAsset(true); setError(""); setAssetNotice("그림을 넣고 있어요…");
     try {
-      const { dataUrl, aspectRatio } = await imageFileToPng(typeof file === "function" ? await file() : file);
-      const asset = await uploadPngAsset(dataUrl, "이미지를 올리지 못했어요.");
+      const { blob, aspectRatio } = await imageFileToUpload(typeof file === "function" ? await file() : file);
+      const asset = await uploadImageBlob(blob, "이미지를 올리지 못했어요.");
       setAssets((current) => [...current, asset]);
       if (purpose === "background") changeDocument(current => ({ ...current, pages: current.pages.map(value => value.id === targetPageId ? { ...value, backgroundAssetId: asset.id } : value) }));
       else if (purpose === "pattern") applyPatternImage(asset, aspectRatio);
@@ -501,32 +550,50 @@ function StorybookEditorContent({ teacherBookId, classroomId }: { teacherBookId?
     setPageIndex(at); setSelectedId(null);
   }
 
+  function showPageNotice(message: string) {
+    setPageNotice(message);
+    if (pageNoticeTimer.current) window.clearTimeout(pageNoticeTimer.current);
+    pageNoticeTimer.current = window.setTimeout(() => setPageNotice(""), 4500);
+  }
+
+  const atPageLimit = (current: StorybookDocument) => !teacherBookId && current.pages.length >= MAX_STORYBOOK_PAGES;
+
+  /** 쪽 복제: 어느 쪽이든 복제할 수 있다(2026-11-02). 복사본은 평범한 내지가 된다. */
   function duplicatePage() {
-    if (!document || !page || isStructurePage(document, pageIndex) || (!teacherBookId && document.pages.length >= MAX_STORYBOOK_PAGES)) return;
-    const copy = clonePage(page);
-    changeDocument((current) => ({ ...current, pages: [...current.pages.slice(0, pageIndex + 1), copy, ...current.pages.slice(pageIndex + 1)] }));
-    setPageIndex(pageIndex + 1); setSelectedId(null);
+    if (!document || !page) return;
+    if (atPageLimit(document)) { showPageNotice(`그림책은 ${MAX_STORYBOOK_PAGES}쪽까지 만들 수 있어요.`); return; }
+    const result = duplicatedPage(document, pageIndex, prefix => clientId(prefix));
+    if (!result) return;
+    changeDocument((current) => ({ ...current, pages: [...current.pages.slice(0, result.at), result.copy, ...current.pages.slice(result.at)] }));
+    setPageIndex(result.at); setSelectedId(null); setPageNotice("");
   }
 
+  /** 쪽 삭제: 못 지우는 쪽(뼈대, 내지 24쪽 이하)이면 까닭을 보여 준다. 선생님 편집(PDF 가져온 책)은 최소 쪽 수가 없다. */
   function deletePage() {
-    if (!document || document.pages.length === 1 || isStructurePage(document, pageIndex)) return;
+    if (!document) return;
+    const blocked = pageDeleteBlock(document, pageIndex, teacherBookId ? 0 : MIN_INNER_PAGES);
+    if (blocked) { showPageNotice(blocked); return; }
     changeDocument((current) => ({ ...current, pages: current.pages.filter((_, index) => index !== pageIndex) }));
-    setPageIndex(Math.max(0, pageIndex - 1)); setSelectedId(null);
+    setPageIndex(Math.max(0, pageIndex - 1)); setSelectedId(null); setPageNotice("");
   }
 
-  /** 패턴을 놓을 쪽: 지금 쪽이 면지면 그 쪽, 아니면 책의 첫 면지. */
-  function patternPageIndex(current: StorybookDocument) {
-    if (current.pages[pageIndex]?.template === "pattern") return pageIndex;
-    return current.pages.findIndex(value => value.template === "pattern");
-  }
-
+  /**
+   * 패턴 면지: 그림 한 장 → 가로 2장 × 4줄 지그재그 8장(2026-11-02).
+   * 지금 쪽이 패턴 면지면 그 쪽을 새 그림으로 바꾸고, 아니면 앞표지 바로 뒤에 패턴 면지 쪽을 새로 넣는다.
+   */
   function applyPatternImage(asset: Asset, aspectRatio?: number) {
     const current = documentRef.current;
     if (!current) return;
-    const target = patternPageIndex(current);
-    if (target < 0) { setError("면지 쪽을 찾지 못했어요. 그림책을 새로 열어 주세요."); return; }
     const elements = patternEightElements({ assetId: asset.id, imageAspect: aspectRatio ?? 1, pageAspect: formatAspectRatio(current.format), makeId: () => clientId("element") });
-    changeDocument(doc => ({ ...doc, pages: doc.pages.map((value, index) => index === target ? replacePattern(value, elements) : value) }));
+    let target = pageIndex;
+    if (current.pages[pageIndex]?.template === "pattern") {
+      changeDocument(doc => ({ ...doc, pages: doc.pages.map((value, index) => index === target ? replacePattern(value, elements) : value) }));
+    } else {
+      if (atPageLimit(current)) { setError(`그림책은 ${MAX_STORYBOOK_PAGES}쪽까지 만들 수 있어요. 쪽을 하나 지운 뒤 패턴 면지를 넣어 주세요.`); setPatternOpen(false); return; }
+      const inserted = insertPatternPage(current, elements, prefix => clientId(prefix));
+      target = inserted.index;
+      changeDocument(() => inserted.document);
+    }
     setPageIndex(target); setSelectedId(null); setSelectedTextId(null); setPatternOpen(false);
   }
 
@@ -682,10 +749,11 @@ function StorybookEditorContent({ teacherBookId, classroomId }: { teacherBookId?
     <div className={`storybook-editor-body${(selected && imageToolsOpen) || selectedText ? " has-inspector" : ""}`}>
       <aside className="storybook-page-rail" aria-label="그림책 쪽 목록">{document.pages.map((item, index) => <button type="button" className={index === pageIndex ? "active" : ""} aria-current={index === pageIndex ? "page" : undefined} aria-label={`${index + 1}쪽 ${pageLabel(document, index)}${index === pageIndex ? " · 선택됨" : ""}`} key={item.id} onClick={() => { setPageIndex(index); setSelectedId(null); }}><span className={`format-${document.format} ${item.backgroundAssetId ? "has-background" : ""}`} style={{ background: item.background }}>{item.elements.slice().sort((a, b) => a.zIndex - b.zIndex).map((element) => <i key={element.id} className={element.type} style={{ left: `${element.x * 100}%`, top: `${element.y * 100}%`, width: `${element.width * 100}%`, height: `${element.height * 100}%` }} />)}</span><b>{index + 1}</b>{pageLabel(document, index) !== `${index + 1}쪽` && <small className={`storybook-page-role role-${pageRole(document, index)}`}>{pageLabel(document, index)}</small>}</button>)}<button type="button" className="add-page" disabled={(!teacherBookId && document.pages.length >= MAX_STORYBOOK_PAGES)} onClick={addPage}>＋<span>쪽 추가</span></button></aside>
       <section className="storybook-workspace">
-        <StorybookToolbar viewportRef={toolbarRef}><button type="button" disabled={!historyState.undo} onClick={undo}>↶ 되돌리기</button><button type="button" disabled={!historyState.redo} onClick={redo}>↷ 다시하기</button><button type="button" disabled={addingAsset} onClick={() => fileRef.current?.click()} title="파일을 고르거나 쪽 위로 끌어다 놓아요">🖼️ 새 그림</button><input ref={fileRef} type="file" accept="image/*" hidden onChange={(event) => void uploadFile(event.target.files?.[0], "element")} /><button type="button" disabled={addingAsset} onClick={() => backgroundFileRef.current?.click()}>🌄 배경 넣기</button>{page.backgroundAssetId && <button type="button" onClick={() => changeDocument((current) => ({ ...current, pages: current.pages.map((value, index) => index === pageIndex ? { ...value, backgroundAssetId: undefined } : value) }))}>배경 지우기</button>}<input ref={backgroundFileRef} type="file" accept="image/*" hidden onChange={(event) => void uploadFile(event.target.files?.[0], "background")} /><button type="button" onClick={addText}>이야기 칸 추가</button><button type="button" disabled={addingAsset} onClick={() => setPatternOpen(true)}>🔁 패턴 면지</button><button type="button" disabled={isStructurePage(document, pageIndex)} title={isStructurePage(document, pageIndex) ? "표지·면지·작가의 말·속표지는 복제하지 않아요" : undefined} onClick={duplicatePage}>쪽 복제</button><button type="button" disabled={document.pages.length === 1 || isStructurePage(document, pageIndex)} title={isStructurePage(document, pageIndex) ? "표지·면지·작가의 말·속표지는 책의 뼈대라 지우지 않아요" : undefined} onClick={deletePage}>쪽 삭제</button></StorybookToolbar>
+        <StorybookToolbar viewportRef={toolbarRef}><button type="button" disabled={!historyState.undo} onClick={undo}>↶ 되돌리기</button><button type="button" disabled={!historyState.redo} onClick={redo}>↷ 다시하기</button><button type="button" disabled={addingAsset} onClick={() => fileRef.current?.click()} title="파일을 고르거나 쪽 위로 끌어다 놓아요">🖼️ 새 그림</button><input ref={fileRef} type="file" accept="image/*" hidden onChange={(event) => void uploadFile(event.target.files?.[0], "element")} /><button type="button" disabled={addingAsset} onClick={() => backgroundFileRef.current?.click()}>🌄 배경 넣기</button>{page.backgroundAssetId && <button type="button" onClick={() => changeDocument((current) => ({ ...current, pages: current.pages.map((value, index) => index === pageIndex ? { ...value, backgroundAssetId: undefined } : value) }))}>배경 지우기</button>}<input ref={backgroundFileRef} type="file" accept="image/*" hidden onChange={(event) => void uploadFile(event.target.files?.[0], "background")} /><button type="button" disabled={addingAsset} onClick={() => setPatternOpen(true)}>🔁 패턴 면지 추가</button><button type="button" onClick={duplicatePage}>쪽 복제</button>{(() => { const blocked = pageDeleteBlock(document, pageIndex, teacherBookId ? 0 : MIN_INNER_PAGES); return <button type="button" className={blocked ? "is-soft-disabled" : undefined} aria-disabled={blocked ? true : undefined} title={blocked || undefined} onClick={deletePage}>쪽 삭제</button>; })()}</StorybookToolbar>
         {teacherBookId && <details className="storybook-teacher-editor-note"><summary>그림책 편집 안내</summary><p>PDF 원본은 쪽 배경입니다. 원본 글자 개별 수정은 지원하지 않으며, 이야기·그림 추가, 배경 교체, 쪽 순서 변경이 가능합니다. 수정 후 그림책 완성하기를 눌러야 새 피드백과 주문에 반영됩니다.</p></details>}
         {selected && !imageToolsOpen && <div className="storybook-selection-actions"><button type="button" onClick={() => setImageToolsOpen(true)}>그림 도구 열기</button><span>손잡이를 끌어 크기를 바꿔요</span><button type="button" onClick={() => setSelectedId(null)}>선택 해제</button></div>}
         {assetNotice && !patternOpen && <p className="storybook-asset-notice" role="status">{assetNotice}</p>}
+        {pageNotice && <p className="storybook-page-notice" role="alert">{pageNotice}</p>}
                 <div className={`storybook-stage-wrap${dropActive ? " is-drop-target" : ""}`} onDragOver={(event) => { if ([...event.dataTransfer.items].some(item => item.kind === "file")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setDropActive(true); } }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropActive(false); }} onDrop={(event) => { event.preventDefault(); setDropActive(false); const file = droppedImage(event); if (file) void uploadFile(file, "element"); else setError("그림 파일(PNG·JPG 등)을 끌어다 놓아 주세요."); }}>{dropActive && <div className="storybook-drop-hint" aria-hidden="true">여기에 놓으면 그림이 들어가요</div>}<div ref={bindStage} className={`storybook-stage format-${document.format}`} style={{ background: page.background }} onPointerDown={(event) => { if ((event.target as HTMLElement).closest(".moveable-control-box")) return; setSelectedId(null); setSelectedTextId(null); }}>
           <div className="storybook-stage-content">
             {renderBackground(page)}
@@ -739,7 +807,7 @@ function StorybookEditorContent({ teacherBookId, classroomId }: { teacherBookId?
           />}
         </div></div>
         {textNotice?.pageId === page.id && <p className="storybook-text-notice" role="status">이야기 칸이 가득 찼어요. 글자 크기를 줄이거나 다음 쪽에 이어 써 주세요.</p>}
-        <p className="storybook-stage-help">{pageRole(document, pageIndex) === "front" ? "1쪽은 앞표지예요. " : pageRole(document, pageIndex) === "back" ? "마지막 쪽은 뒷표지예요. 오른쪽 아래 바코드 자리는 비워 두세요. " : `${pageIndex + 1}쪽 · ${pageLabel(document, pageIndex) === `${pageIndex + 1}쪽` ? "내지" : pageLabel(document, pageIndex)}예요. `}{document.pages.length}쪽{!teacherBookId && " / 최소 24쪽"} · 그림 파일을 쪽 위로 끌어다 놓거나 ‘새 그림’으로 넣고, 동그란 손잡이로 크기를 바꿔요.</p>
+        <p className="storybook-stage-help">{pageRole(document, pageIndex) === "front" ? "1쪽은 앞표지예요. " : pageRole(document, pageIndex) === "back" ? "마지막 쪽은 뒷표지예요. 오른쪽 아래 바코드 자리는 비워 두세요. " : `${pageIndex + 1}쪽 · ${pageLabel(document, pageIndex) === `${pageIndex + 1}쪽` ? "내지" : pageLabel(document, pageIndex)}예요. `}전체 {document.pages.length}쪽 · 내지 {innerPageCount(document)}쪽{!teacherBookId && ` / 최소 ${MIN_INNER_PAGES}쪽`} · 그림 파일을 쪽 위로 끌어다 놓거나 ‘새 그림’으로 넣고, 동그란 손잡이로 크기를 바꿔요.</p>
       </section>
       {((selected && imageToolsOpen) || selectedText) && <aside id="storybook-inspector" className="storybook-inspector" aria-label={selected ? "그림 꾸미기" : "이야기 꾸미기"}>
         <header className="storybook-inspector-heading"><h2>{selected ? "그림 꾸미기" : "이야기 꾸미기"}</h2><button type="button" className="small-button" aria-label="꾸미기 닫기" onClick={() => { if (selected) setImageToolsOpen(false); setSelectedTextId(null); toolbarRef.current?.focus({ preventScroll: true }); }}>닫기</button></header>
@@ -768,8 +836,9 @@ function StorybookEditorContent({ teacherBookId, classroomId }: { teacherBookId?
     </div>
 
     {patternOpen && <div className="storybook-modal-backdrop" role="presentation" onMouseDown={() => { if (!addingAsset) setPatternOpen(false); }}><section className="storybook-picker-modal storybook-pattern-modal" role="dialog" aria-modal="true" aria-labelledby="pattern-dialog-title" onMouseDown={(event) => event.stopPropagation()}>
-      <header><div><p className="eyebrow">면지 꾸미기</p><h2 id="pattern-dialog-title">🔁 패턴 면지 만들기</h2></div><button type="button" className="small-button" disabled={addingAsset} onClick={() => setPatternOpen(false)}>닫기</button></header>
-      <p>그림 한 장을 넣으면 면지 쪽에 8장으로 복제해 엇갈리게 채워요. 다시 넣으면 새 그림으로 바뀌어요.</p>
+      <header><div><p className="eyebrow">면지 꾸미기</p><h2 id="pattern-dialog-title">🔁 패턴 면지 추가</h2></div><button type="button" className="small-button" disabled={addingAsset} onClick={() => setPatternOpen(false)}>닫기</button></header>
+      <p>{page.template === "pattern" ? "그림 한 장을 넣으면 이 패턴 면지가 새 그림으로 바뀌어요." : "그림 한 장을 넣으면 앞표지 바로 뒤에 패턴 면지 쪽이 생겨요."} 가로로 2장씩, 4줄을 지그재그로 엇갈려 8장을 놓아요.</p>
+      <div className="storybook-pattern-sample" aria-hidden="true">{[0, 1, 2, 3].flatMap(row => [0, 1].map(col => <i key={`${row}-${col}`} style={{ left: `${(row % 2 ? 40 : 20) + col * 40}%`, top: `${20 + row * 20}%` }} />))}</div>
       <button type="button" className={`storybook-pattern-drop${dropActive ? " is-drop-target" : ""}`} disabled={addingAsset} onClick={() => patternFileRef.current?.click()} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setDropActive(true); }} onDragLeave={() => setDropActive(false)} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); setDropActive(false); const file = droppedImage(event); if (file) void uploadFile(file, "pattern"); else setError("그림 파일(PNG·JPG 등)을 끌어다 놓아 주세요."); }}>
         <b aria-hidden="true">🖼️</b><span>{addingAsset ? "패턴을 만드는 중…" : "그림을 여기로 끌어다 놓거나, 눌러서 파일을 골라요"}</span><small>복사한 그림은 Ctrl+V(맥은 ⌘V)로 붙여넣어도 돼요.</small>
       </button>

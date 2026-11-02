@@ -82,3 +82,10 @@
 .design-surface .storybook-editor-shell .storybook-stage.format-portrait:not(.preview){width:min(100%,calc((100dvh - 40px) * 3 / 4))}
 .storybook-stage-element.image:not(.selected){touch-action:pan-y pinch-zoom}
 .storybook-book-grid>article .storybook-ebook-link{display:flex;align-items:center;justify-content:center;min-height:44px;font-weight:700}
+/* 쪽 삭제를 못 할 때 까닭(2026-11-02). 단추는 흐리게 보이지만 눌러서 까닭을 볼 수 있다. */
+.storybook-page-notice{margin:0;padding:10px 16px;background:#fff1e6;border-bottom:1px solid #f0c7a5;color:#7a3410;font-weight:800;animation:storybook-notice-in .18s ease-out}
+.storybook-toolbar button.is-soft-disabled{opacity:.48;cursor:not-allowed}
+@keyframes storybook-notice-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+/* 패턴 면지 견본: 가로 2장 × 4줄 지그재그 */
+.storybook-pattern-sample{position:relative;width:120px;aspect-ratio:243/248;margin:4px auto 12px;border:1px solid #d9c7a7;border-radius:4px;background:#fff6e3}
+.storybook-pattern-sample i{position:absolute;width:16%;height:16%;transform:translate(-50%,-50%);border-radius:50%;background:#f3a6c8;border:1px solid #c66f98}

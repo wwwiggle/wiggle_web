@@ -63,7 +63,7 @@ export function TeacherStorybookPreview({ classroomId, storybookId }: { classroo
   }
 
   return <main className="teacher-book-preview-shell">
-    <header className="teacher-book-preview-header"><Logo /><a className="small-button" href={`/teacher/class/${classroomId}/books`}>← 그림책 목록</a><div><p>{book.animal} {book.nickname} · {book.classroomName}</p><h1>{book.title}</h1></div><a className="button secondary" href={`/teacher/class/${classroomId}/books/${book.id}/ebook`}>📖 ebook으로 보기</a><button type="button" className="button primary" disabled={downloading} onClick={() => void downloadPdf()}>{downloading ? "PDF 만드는 중…" : "⬇️ PDF 다운로드"}</button></header>
+    <header className="teacher-book-preview-header"><Logo /><a className="small-button" href={`/teacher/class/${classroomId}/books`}>← 그림책 목록</a><div><p>{book.animal} {book.nickname} · {book.classroomName}</p><h1>{book.title}</h1></div><a className="button secondary" href={`/teacher/class/${classroomId}/books/ebooks?book=${encodeURIComponent(book.id)}`}>📖 ebook으로 보기</a><button type="button" className="button primary" disabled={downloading} onClick={() => void downloadPdf()}>{downloading ? "PDF 만드는 중…" : "⬇️ PDF 다운로드"}</button></header>
     {error && <p className="error-box" role="alert">{error}</p>}
     <section className="teacher-book-reader" aria-label={`${book.title} 그림책 미리보기`}>
       <button type="button" aria-label="이전 쪽" disabled={pageIndex === 0} onClick={() => setPageIndex((value) => value - 1)}>‹</button>

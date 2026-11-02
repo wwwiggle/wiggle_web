@@ -1,0 +1,55 @@
+/* 두 쪽 펼침 책 넘기기(2026-11-02). BookFlip.tsx */
+.flip-scene{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;gap:12px;min-height:0;width:100%}
+.flip-arrow{width:44px;min-height:64px;border:0;border-radius:22px;background:#fffdf8;color:#375334;font-size:40px;line-height:1;cursor:pointer;box-shadow:0 3px 12px #26351e22;transition:transform .15s ease,opacity .2s ease}
+.flip-arrow:hover:not(:disabled){transform:scale(1.06)}
+.flip-arrow:disabled{opacity:.25;cursor:default}
+.flip-viewport{display:grid;place-items:center;min-width:0;min-height:0;touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:pointer}
+.flip-book{position:relative;width:min(100%,calc(var(--flip-max-h) * var(--page-ratio) * 2));aspect-ratio:calc(var(--page-ratio) * 2);perspective:2800px;transition:transform var(--flip-ms) cubic-bezier(.45,.05,.35,1)}
+.flip-book.is-closed-front{transform:translateX(-25%)}
+.flip-book.is-closed-back{transform:translateX(25%)}
+.flip-half{position:absolute;top:0;bottom:0;width:50%}
+.flip-half-left{left:0}.flip-half-right{left:50%}
+
+/* 쪽 한 장: 편집기의 쪽 그리기 규칙(.storybook-stage)을 그대로 쓰고, 크기만 반쪽 칸에 맞춘다. */
+.flip-book .flip-page{position:absolute;inset:0;overflow:hidden;container-type:inline-size}
+.flip-book .flip-page.storybook-stage,.flip-book .flip-page.storybook-stage.preview{width:100%!important;height:100%!important;min-width:0!important;max-width:none!important;max-height:none!important;aspect-ratio:auto!important;margin:0!important;box-shadow:none;animation:none!important;touch-action:pan-y;border-radius:0;cursor:inherit}
+.flip-book .flip-page .storybook-stage-element{cursor:inherit}
+.flip-page.is-blank{background:#fffdf7}
+.flip-left{border-radius:6px 0 0 6px;box-shadow:-8px 12px 26px rgb(20 30 20 / 22%)}
+.flip-right{border-radius:0 6px 6px 0;box-shadow:8px 12px 26px rgb(20 30 20 / 22%)}
+/* 책 등 쪽으로 갈수록 살짝 어두워지는 종이 굴곡 */
+.flip-left::after,.flip-right::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:10004}
+.flip-left::after{background:linear-gradient(90deg,transparent 88%,rgb(0 0 0 / 5%) 95%,rgb(0 0 0 / 13%))}
+.flip-right::after{background:linear-gradient(270deg,transparent 88%,rgb(0 0 0 / 5%) 95%,rgb(0 0 0 / 13%))}
+.flip-spine{position:absolute;top:0;bottom:0;left:calc(50% - 1px);width:2px;background:rgb(0 0 0 / 14%);z-index:4;pointer-events:none}
+.flip-page-number{position:absolute;bottom:1.5%;left:0;right:0;text-align:center;font-size:clamp(9px,2.2cqw,13px);color:#687060;z-index:10003}
+
+/* 넘어가는 종이 한 장: 앞면 = 넘기기 전 쪽, 뒷면 = 넘긴 뒤 반대편 쪽 */
+.flip-leaf{position:absolute;top:0;width:50%;height:100%;z-index:6;transform-style:preserve-3d;will-change:transform;pointer-events:none}
+.flip-forward{left:50%;transform-origin:0 50%;animation:flip-forward var(--flip-ms) cubic-bezier(.45,.05,.35,1) both}
+.flip-backward{left:0;transform-origin:100% 50%;animation:flip-backward var(--flip-ms) cubic-bezier(.45,.05,.35,1) both}
+.flip-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform-style:preserve-3d}
+.flip-face-back{transform:rotateY(180deg)}
+.flip-face .flip-page{box-shadow:none}
+.flip-shade{position:absolute;inset:0;z-index:10006;pointer-events:none;opacity:0}
+.flip-forward .flip-face-front .flip-shade{background:linear-gradient(90deg,rgb(0 0 0 / 30%),rgb(0 0 0 / 4%) 70%);animation:flip-shade-in var(--flip-ms) ease-in both}
+.flip-forward .flip-face-back .flip-shade{background:linear-gradient(270deg,rgb(0 0 0 / 30%),rgb(0 0 0 / 4%) 70%);animation:flip-shade-out var(--flip-ms) ease-out both}
+.flip-backward .flip-face-front .flip-shade{background:linear-gradient(270deg,rgb(0 0 0 / 30%),rgb(0 0 0 / 4%) 70%);animation:flip-shade-in var(--flip-ms) ease-in both}
+.flip-backward .flip-face-back .flip-shade{background:linear-gradient(90deg,rgb(0 0 0 / 30%),rgb(0 0 0 / 4%) 70%);animation:flip-shade-out var(--flip-ms) ease-out both}
+@keyframes flip-forward{0%{transform:rotateY(0) translateZ(1px)}50%{transform:rotateY(-90deg) translateZ(1px) scaleY(1.015)}100%{transform:rotateY(-180deg) translateZ(1px)}}
+@keyframes flip-backward{0%{transform:rotateY(0) translateZ(1px)}50%{transform:rotateY(90deg) translateZ(1px) scaleY(1.015)}100%{transform:rotateY(180deg) translateZ(1px)}}
+@keyframes flip-shade-in{0%{opacity:0}50%{opacity:1}100%{opacity:1}}
+@keyframes flip-shade-out{0%{opacity:1}50%{opacity:1}100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.flip-book{transition:none}.flip-leaf{display:none}}
+@media(max-width:680px){.flip-scene{grid-template-columns:34px minmax(0,1fr) 34px;gap:4px}.flip-arrow{width:32px;min-height:52px;font-size:30px}}
+.flip-book .flip-page{border:0!important;outline:0!important}
+/* 책 읽기 화면: 머리줄 → (안내) → 책 → 바닥줄. 책이 남은 높이를 모두 쓰고 가운데에 놓인다. */
+.storybook-preview.ebook-flip{display:flex;flex-direction:column;gap:6px}
+.storybook-preview.ebook-flip>.flip-scene{flex:1;min-height:0}
+.storybook-preview.ebook-flip>footer{flex:none;display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:4px 12px;min-height:34px}
+.flip-prefetch{left:50%;visibility:hidden;pointer-events:none;z-index:-1;overflow:hidden}.flip-prefetch-page{position:absolute;inset:0}
+/* 책 크기는 남은 칸(가로·세로) 안에 맞춘다 — 머리줄·공유 설정·바닥줄 높이가 화면마다 달라도 겹치지 않게(2026-11-02, 844×390에서 확인). */
+.flip-scene{align-items:stretch}
+.flip-arrow{align-self:center}
+.flip-viewport{container-type:size;min-height:120px}
+.flip-viewport>.flip-book{width:min(100cqw,calc(100cqh * var(--page-ratio) * 2))}

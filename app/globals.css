@@ -2406,9 +2406,12 @@ body {
 }
 
 /* 유료 요금제로 잠긴 기능(2026-10-31). 누를 수 없고, 올리면 금지 표시가 뜬다. lib/feature-locks.ts */
-.paid-lock{position:relative;cursor:not-allowed!important;user-select:none;-webkit-user-select:none;filter:grayscale(.85);opacity:.6}
+.paid-lock{position:relative;cursor:not-allowed!important;user-select:none;-webkit-user-select:none}
 .paid-lock *{pointer-events:none;cursor:not-allowed!important}
-.paid-lock-badge{display:inline-flex;align-items:center;gap:4px;width:max-content;max-width:100%;margin-top:6px;padding:2px 10px;border-radius:999px;background:#3b3b3b;color:#fff;font-size:12px;font-weight:800;line-height:1.6;white-space:nowrap;filter:none}
+/* 2026-11-02: 잠긴 영역 전체에 투명도를 걸면 「유료 요금제」 배지까지 흐려져 안 보였다. 내용만 흐리고 배지는 또렷하게 둔다. */
+.paid-lock,.paid-lock :not(.paid-lock-badge,.paid-lock-badge *){color:#8d938f!important}
+.paid-lock :is(img,svg,canvas,.desk-art-image){filter:grayscale(1);opacity:.42}
+.paid-lock .paid-lock-badge,.paid-lock-badge{display:inline-flex;align-items:center;gap:4px;width:max-content;max-width:100%;margin-top:6px;padding:3px 11px;border:1.5px solid #d99a00;border-radius:999px;background:#ffcd3c;color:#3a2a00!important;font-size:13px;font-weight:900;line-height:1.5;white-space:nowrap;filter:none;opacity:1;box-shadow:0 1px 0 rgb(0 0 0 / 12%)}
 .paid-lock-screen{min-height:100dvh;display:grid;place-content:center;gap:14px;padding:24px;text-align:center;background:#fffaf0;color:#294329}
 .paid-lock-screen h1{margin:0;font-size:clamp(22px,4vw,30px)}
 .paid-lock-screen p{margin:0;font-size:16px;line-height:1.6}

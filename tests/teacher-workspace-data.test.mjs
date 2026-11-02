@@ -7,6 +7,7 @@ import { FsArtworksStore } from "../db/adapters/artworks-store.ts";
 import { sha256 } from "../lib/token-crypto.ts";
 import { resetRows } from "./harness/db.mjs";
 import { startTestServer } from "./harness/server.mjs";
+import { DRAWING_LOCKED } from "../lib/feature-locks.ts";
 
 const ownerHeaders = { cookie: "wiggle_teacher=workspace_owner_session" };
 const otherHeaders = { cookie: "wiggle_teacher=workspace_other_session" };
@@ -70,7 +71,8 @@ test("오늘 수업은 학생별 최근 그림을 보여 주고, 삭제 명단�
   assert.deepEqual(data.students.map((student) => student.id), ["student_one", "student_two"]);
   const [first, second] = data.students;
   assert.equal(first.sessionArtwork.id, "artwork_latest");
-  assert.equal(first.sessionArtwork.thumbnail, thumbnail);
+  // 그림 실시간 보기가 유료 요금제로 잠겨 있으면 6초 폴링에서 썸네일을 읽지 않는다(2026-11-02 속도 개선).
+  assert.equal(first.sessionArtwork.thumbnail, DRAWING_LOCKED ? null : thumbnail);
   assert.equal(second.sessionArtwork, null, "아직 그리지 않은 아이는 비워 둔다");
   assert.equal(data.archivedStudents[0].id, "student_archived", "삭제 명단은 별도 복원 목록에서만 제공한다");
 });

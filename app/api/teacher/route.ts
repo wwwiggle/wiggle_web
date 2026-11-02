@@ -1,4 +1,5 @@
 import { isAdmin } from "@/lib/admin";
+import { DRAWING_LOCKED } from "@/lib/feature-locks";
 import { classroomProfileInput, type ClassroomProfile } from "@/lib/classroom-profile";
 import { cookies } from "next/headers";
 import { bindings, randomEntryCode } from "@/db/runtime";
@@ -169,7 +170,8 @@ export async function GET(request: Request) {
   // 회차 개념이 사라져(2026-09-12) 오늘 수업은 학생별 **최근 그림**을 보여 준다.
   const thumbnailCache = new Map<string, Promise<string | null>>();
   const thumbnailFor = (key: string | null) => {
-    if (!key) return Promise.resolve(null);
+    // 그림 실시간 보기가 유료 요금제로 잠겨 있으면 6초마다 학생 수만큼 저장소를 읽지 않는다(2026-11-02 속도 개선).
+    if (!key || DRAWING_LOCKED) return Promise.resolve(null);
     if (!thumbnailCache.has(key)) thumbnailCache.set(key, toDataUrl(key));
     return thumbnailCache.get(key)!;
   };

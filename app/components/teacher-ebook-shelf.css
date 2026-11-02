@@ -1,0 +1,40 @@
+/* 우리 반 ebook 서재(2026-11-02). TeacherEbookShelf.tsx */
+.ebook-shelf-page{max-width:1240px;margin:0 auto;padding:0 24px 64px;color:#24342a}
+.ebook-shelf-header{display:flex;align-items:center;gap:10px;min-height:76px}
+.ebook-shelf-header .brand{margin-right:auto}
+.ebook-shelf-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:28px 32px;margin:8px 0 28px;border-radius:22px;background:linear-gradient(120deg,#fffdf5 0 60%,#e6f3e7);border:1px solid #e3dccb}
+.ebook-shelf-hero h1{margin:4px 0 8px;font-size:clamp(26px,3.6vw,38px);letter-spacing:-.03em}
+.ebook-shelf-hero p{margin:0;color:#5b6a5f;font-weight:600;line-height:1.6}
+.ebook-shelf-hero .eyebrow{color:#2f7a3c;font-weight:800}
+.ebook-shelf-count{display:grid;justify-items:end;flex-shrink:0}
+.ebook-shelf-count b{font-size:48px;line-height:1;color:#2f5f3f}
+.ebook-shelf-count span{color:#5b6a5f;font-weight:700}
+.ebook-shelf-search{display:flex;align-items:center;gap:10px;margin:0 0 18px;max-width:360px;font-weight:700}
+.ebook-shelf-search input{flex:1;min-height:44px;padding:0 14px;border:1px solid #c9d2cb;border-radius:12px;font:inherit}
+/* 선반: 책 줄 아래로 나무 선반이 깔린다(배경 그림 대신 줄마다 반복되는 그라데이션). */
+.ebook-shelf{--shelf-row:318px;list-style:none;margin:0;padding:0 26px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-auto-rows:var(--shelf-row);column-gap:26px;border-radius:16px;background:
+  repeating-linear-gradient(180deg,transparent 0 calc(var(--shelf-row) - 22px),#c99a5e calc(var(--shelf-row) - 22px) calc(var(--shelf-row) - 14px),#a8773f calc(var(--shelf-row) - 14px) calc(var(--shelf-row) - 8px),transparent calc(var(--shelf-row) - 8px) var(--shelf-row)),
+  linear-gradient(180deg,#f6efe0,#efe4cf)}
+.ebook-shelf li{display:flex;align-items:flex-end;padding:18px 0 24px;min-width:0}
+.ebook-shelf-book{all:unset;box-sizing:border-box;width:100%;display:grid;gap:6px;cursor:pointer;text-align:left;transform:rotate(var(--tilt,0deg));transition:transform .22s ease}
+.ebook-shelf-book:hover,.ebook-shelf-book:focus-visible{transform:translateY(-8px) rotate(0deg)}
+.ebook-shelf-book:focus-visible .ebook-shelf-cover{outline:3px solid #2f7a3c;outline-offset:3px}
+.ebook-shelf-book:disabled{cursor:progress}
+.ebook-shelf-cover{position:relative;display:grid;place-items:center;aspect-ratio:243/248;overflow:hidden;border-radius:3px 7px 7px 3px;box-shadow:inset 7px 0 0 rgb(0 0 0 / 10%),inset 9px 0 2px rgb(255 255 255 / 25%),4px 8px 16px rgb(60 40 10 / 28%)}
+.ebook-shelf-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.ebook-shelf-cover-title{position:absolute;left:0;right:0;bottom:0;padding:6px 8px;background:#fffffff0;font-size:13px;font-weight:800;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ebook-shelf-opening{position:absolute;inset:0;display:grid;place-items:center;background:#ffffffcc;font-weight:800;color:#2f5f3f}
+.ebook-shelf-book b{font-size:15px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ebook-shelf-book small{color:#5b6a5f;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ebook-shelf-loading{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:26px;padding:22px 26px}
+.ebook-shelf-loading i{display:block;aspect-ratio:243/248;border-radius:6px;background:linear-gradient(100deg,#eceeed 30%,#f6f7f6 50%,#eceeed 70%) 0 0/300% 100%;animation:ebook-shelf-shimmer 1.4s ease-in-out infinite}
+@keyframes ebook-shelf-shimmer{from{background-position:100% 0}to{background-position:0 0}}
+.ebook-shelf-reader .storybook-preview{animation:ebook-shelf-open .22s ease-out}
+@keyframes ebook-shelf-open{from{opacity:0}to{opacity:1}}
+@media(max-width:700px){
+  .ebook-shelf-page{padding:0 14px 48px}
+  .ebook-shelf-hero{flex-direction:column;align-items:flex-start;padding:20px}
+  .ebook-shelf-count{justify-items:start}
+  .ebook-shelf{--shelf-row:262px;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px;padding:0 14px}
+}
+@media(prefers-reduced-motion:reduce){.ebook-shelf-book,.ebook-shelf-book:hover{transform:none;transition:none}}

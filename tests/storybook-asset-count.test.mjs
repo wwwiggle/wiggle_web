@@ -62,4 +62,14 @@ test('HTTP: a book with 60 stored images can add, reuse and save more without ch
  assert.equal((await server.fetch(`/api/storybooks/${id}/assets`,{method:'POST',headers:{...headers,origin:'https://invalid.example','content-type':'image/png'},body:png})).status,403);
  assert.equal((await server.fetch(`/api/storybooks/${id}/assets`,{method:'POST',headers:{'content-type':'image/png'},body:png})).status,401);
  assert.equal((await upload(png)).status,201,'valid upload still works after rejected files');
+ // 2026-11-02: 투명한 곳이 없는 사진은 JPEG로 받는다(PNG보다 몇 배 작아 올리기·보기가 빠르다).
+ const jpeg=await sharp({create:{width:30,height:24,channels:3,background:'#3366aa'}}).jpeg({quality:90}).toBuffer();
+ const uploadJpeg=body=>server.fetch(`/api/storybooks/${id}/assets`,{method:'POST',headers:{...headers,'content-type':'image/jpeg'},body});
+ const jpegResponse=await uploadJpeg(jpeg);assert.equal(jpegResponse.status,201);
+ const jpegAsset=(await jpegResponse.json()).asset;assert.equal(jpegAsset.contentType,'image/jpeg');
+ const served=await server.fetch(`/api/storybooks/${id}/assets/${jpegAsset.id}`,{headers});
+ assert.equal(served.headers.get('content-type'),'image/jpeg');assert.deepEqual(Buffer.from(await served.arrayBuffer()),jpeg);
+ assert.equal((await uploadJpeg(Buffer.from([0xff,0xd8,0xff,0xe0,0,4,1,2,0xff,0xd9]))).status,415,'JPEG without a frame header is rejected');
+ assert.equal((await uploadJpeg(png)).status,415,'a PNG labelled as JPEG is rejected');
+ assert.equal((await server.fetch(`/api/storybooks/${id}/assets`,{method:'POST',headers:{...headers,'content-type':'image/webp'},body:jpeg})).status,400,'other image types are not accepted');
 });
