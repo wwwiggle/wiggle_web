@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState, type ImgHTMLAttributes, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ImgHTMLAttributes, type ReactNode } from "react";
 import { storybookEditorFetch } from "@/lib/storybook-editor-fetch";
 
 type Entry = { promise: Promise<string>; url?: string; bytes: number; users: number; controller: AbortController };
@@ -21,6 +21,20 @@ export function AuthenticatedImageCache({ children }: { children: ReactNode }) {
   useEffect(() => () => prune(cache, true), [cache]);
   return <Images.Provider value={cache}>{children}</Images.Provider>;
 }
+/**
+ * 방금 올린 그림을 캐시에 미리 넣어, 서버에서 다시 내려받지 않고 바로 보이게 한다(2026-11-02 속도 개선).
+ * 캐시 밖(Provider 없음)에서는 아무것도 하지 않는다.
+ */
+export function useSeedAuthenticatedImage() {
+  const shared = useContext(Images);
+  return useCallback((src: string, blob: Blob) => {
+    if (!shared || shared.has(src)) return;
+    const url = URL.createObjectURL(blob);
+    shared.set(src, { bytes: blob.size, users: 0, controller: new AbortController(), url, promise: Promise.resolve(url) });
+    prune(shared);
+  }, [shared]);
+}
+
 export function AuthenticatedImage({ src, alt, className, onLoad, style, lazy = false }: { src: string; alt: string; className?: string; onLoad?: ImgHTMLAttributes<HTMLImageElement>["onLoad"]; style?: ImgHTMLAttributes<HTMLImageElement>["style"]; lazy?: boolean }) {
   const shared = useContext(Images);
   const [visible, setVisible] = useState(!lazy);

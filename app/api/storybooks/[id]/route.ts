@@ -2,6 +2,7 @@ import { storybookEditorActor } from "@/lib/storybook-editor-auth";
 import { bindings } from "@/db/runtime";
 import { MAX_STORYBOOK_PAGES, storybookCompletionError, validateStorybookDocument } from "@/lib/storybook-model";
 import { cleanText, jsonError, noStoreJson, rateLimit, sameOrigin } from "@/lib/security";
+import { innerPageCount } from "@/lib/storybook-structure";
 import { ownedStorybook, priorStorybookMutation, storybookAssets, storybookAssetIds, storybookResponse } from "@/lib/storybook-store";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -44,7 +45,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   }
   const title = typeof payload.title === "string" ? cleanText(payload.title, 60) : book.title;
   const complete = payload.complete === true;
-  const completionError = complete && storybookCompletionError(title, document.pages.length, !new URL(request.url).pathname.startsWith("/api/teacher/"));
+  const completionError = complete && storybookCompletionError(title, innerPageCount(document), !new URL(request.url).pathname.startsWith("/api/teacher/"));
   if (completionError) return jsonError(completionError);
   const newRevision = book.revision + 1;
   const db = bindings().DB;

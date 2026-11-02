@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { storybookAspectRatio, type StorybookCrop, type StorybookDocument, type StorybookElement, type StorybookPage } from "@/lib/storybook-model";
-import { ebookViews } from "@/lib/storybook-structure";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { type StorybookCrop, type StorybookDocument, type StorybookElement, type StorybookPage } from "@/lib/storybook-model";
+import { BookFlip, type BookSpread } from "./BookFlip";
 import { ebookFetch } from "@/lib/storybook-editor-fetch";
 import { copyEbookLink, downloadEbookPdf, EBOOK_CONSENT_LABELS, requestEbookLink } from "@/lib/ebook-client";
 import { AuthenticatedImage, AuthenticatedImageCache } from "./AuthenticatedImage";
@@ -20,24 +20,21 @@ function imageCropStyle(crop?: StorybookCrop): CSSProperties {
   return { left: `${-crop.x / crop.width * 100}%`, top: `${-crop.y / crop.height * 100}%`, width: `${100 / crop.width}%`, height: `${100 / crop.height}%`, objectFit: "fill" };
 }
 
-export function EbookViewer({ token }: { token: string }) {
-  return <AuthenticatedImageCache><EbookViewerContent token={token} /></AuthenticatedImageCache>;
+/** onClose가 있으면 그림책 서재 위에 겹쳐 열린 것이다(닫으면 서재로 돌아간다). */
+export function EbookViewer({ token, onClose }: { token: string; onClose?: () => void }) {
+  return <AuthenticatedImageCache><EbookViewerContent token={token} onClose={onClose} /></AuthenticatedImageCache>;
 }
 
-function EbookViewerContent({ token }: { token: string }) {
+function EbookViewerContent({ token, onClose }: { token: string; onClose?: () => void }) {
   const [data, setData] = useState<EbookData | null>(null);
   const [error, setError] = useState("");
-  const [spread, setSpread] = useState(false);
-  // The visible page, not the view number, is the state: switching between one and two pages keeps the place.
-  const [anchorPage, setAnchorPage] = useState(0);
-  const [turn, setTurn] = useState<{ page: number; direction: 1 | -1 } | null>(null);
+  const [position, setPosition] = useState<{ spread: BookSpread; index: number; total: number } | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [consentMethod, setConsentMethod] = useState("");
   const [consentChecked, setConsentChecked] = useState(false);
-  const turnLock = useRef(false), timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const swipe = useRef<{ x: number; y: number } | null>(null);
   const shell = useRef<HTMLElement>(null);
+  const onSpread = useCallback((spread: BookSpread, index: number, total: number) => setPosition({ spread, index, total }), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -50,34 +47,12 @@ function EbookViewerContent({ token }: { token: string }) {
   }, [token]);
 
   useEffect(() => {
-    const query = window.matchMedia("(min-width: 900px) and (min-aspect-ratio: 5/4)");
-    const update = () => setSpread(query.matches);
-    update(); query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
+    if (!onClose) return;
+    const key = (event: KeyboardEvent) => { if (event.key === "Escape" && !window.document.fullscreenElement) { event.preventDefault(); onClose(); } };
+    window.addEventListener("keydown", key); return () => window.removeEventListener("keydown", key);
+  }, [onClose]);
 
   const document = data?.storybook.document;
-  const views = useMemo(() => document ? ebookViews(document, spread) : [], [document, spread]);
-  const viewIndex = Math.max(0, views.findIndex(view => view.pages.includes(anchorPage)));
-
-  function navigate(direction: 1 | -1) {
-    const next = viewIndex + direction;
-    if (next < 0 || next >= views.length || turnLock.current) return;
-    const from = views[viewIndex];
-    turnLock.current = true;
-    setTurn({ page: direction > 0 ? from.pages[from.pages.length - 1] : from.pages[0], direction });
-    setAnchorPage(views[next].pages[0]);
-    timer.current = setTimeout(() => { setTurn(null); turnLock.current = false; }, 520);
-  }
-  useEffect(() => () => clearTimeout(timer.current), []);
-  useEffect(() => {
-    const key = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement | null)?.matches("input, select, textarea")) return;
-      if (event.key === "ArrowRight") { event.preventDefault(); navigate(1); }
-      if (event.key === "ArrowLeft") { event.preventDefault(); navigate(-1); }
-    };
-    window.addEventListener("keydown", key); return () => window.removeEventListener("keydown", key);
-  });
 
   async function toggleFullscreen() {
     try {
@@ -100,25 +75,20 @@ function EbookViewerContent({ token }: { token: string }) {
   const renderElement = (element: StorybookElement) => <div key={element.id} className={`storybook-stage-element ${element.type}`} style={{ left: `${element.x * 100}%`, top: `${element.y * 100}%`, width: `${element.width * 100}%`, height: `${element.height * 100}%`, transform: `rotate(${element.rotation}deg)`, zIndex: element.type === "text" ? 10_002 : element.zIndex + 1, opacity: element.opacity, color: element.color, textAlign: element.align }}>
     {element.type === "image" && element.assetId ? <AuthenticatedImage src={assetUrl(element.assetId)} alt="그림책 그림" style={imageCropStyle(element.crop)} /> : element.type === "text" ? <StorybookTextInput element={element} format={document.format} interactive={false} /> : null}
   </div>;
-  const pageView = (index: number, extra = "") => {
-    const page: StorybookPage | undefined = document.pages[index];
-    return <div className={`storybook-stage preview reader-page format-${document.format} ${extra}`} style={{ background: page?.background ?? "#faf8f1" }}>
-      {page && <div className="storybook-stage-content">
-        {page.backgroundAssetId && <AuthenticatedImage className="storybook-page-background" src={assetUrl(page.backgroundAssetId)} alt="그림책 쪽 배경" />}
-        {page.elements.slice().sort((a, b) => a.zIndex - b.zIndex).map(renderElement)}
-      </div>}
-    </div>;
-  };
-  const view = views[Math.min(viewIndex, views.length - 1)];
-  const twoUp = view.pages.length === 2;
+  const pageContent = (page: StorybookPage) => <>
+    {page.backgroundAssetId && <AuthenticatedImage className="storybook-page-background" src={assetUrl(page.backgroundAssetId)} alt="그림책 쪽 배경" />}
+    {page.elements.slice().sort((a, b) => a.zIndex - b.zIndex).map(renderElement)}
+  </>;
   const share = data.share;
 
-  return <main ref={shell} className={`storybook-preview storybook-reader ebook-viewer ${spread ? "ebook-spread" : "ebook-single"}`} aria-label={`${data.storybook.title || "그림책"} ebook`}>
+  return <main ref={shell} className="storybook-preview storybook-reader ebook-viewer ebook-flip" aria-label={`${data.storybook.title || "그림책"} ebook`}>
     <header>
       <b>{data.storybook.title || "제목 없는 그림책"}</b>
       <div>
-        {data.viewer === "owner" && <a className="small-button" href="/student/books">내 그림책</a>}
-        {data.viewer === "teacher" && <a className="small-button" href="/teacher">선생님 화면</a>}
+        {onClose ? <button type="button" className="small-button" onClick={onClose}>← 그림책 서재</button> : <>
+          {data.viewer === "owner" && <a className="small-button" href="/student/books">내 그림책</a>}
+          {data.viewer === "teacher" && <a className="small-button" href="/teacher">선생님 화면</a>}
+        </>}
         {data.viewer !== "public" && bookId && <button type="button" className="small-button" disabled={busy} onClick={() => void act(async () => { const copied = await copyEbookLink(`/ebook/${token}`); setMessage(`${copied ? "링크를 복사했어요. " : ""}${share?.shared ? "링크를 가진 사람은 누구나 볼 수 있어요." : "이 링크는 작가와 선생님만 열 수 있어요."}`); })}><span className="ebook-icon" aria-hidden="true">🔗 </span>링크 복사</button>}
         {data.viewer !== "public" && <button type="button" className="small-button" disabled={busy} onClick={() => void act(async () => { await downloadEbookPdf(token, data.storybook.title); setMessage("정사각형 PDF를 내려받았어요."); })}><span className="ebook-icon" aria-hidden="true">⬇️ </span>PDF</button>}
         <button type="button" className="small-button" onClick={() => void toggleFullscreen()}><span className="ebook-icon" aria-hidden="true">⛶ </span>전체 화면</button>
@@ -139,14 +109,7 @@ function EbookViewerContent({ token }: { token: string }) {
       </div>}
       <button type="button" className="text-button" disabled={busy} onClick={() => { if (window.confirm("새 링크를 만들면 지금 링크는 더 이상 열리지 않고, 공유도 꺼져요. 바꿀까요?")) void act(async () => { const next = await requestEbookLink(bookId, { teacher: true, action: "rotate" }); window.location.replace(next.path); }); }}>새 링크로 바꾸기</button>
     </details>}
-    <div className="reader-scene" style={{ "--page-ratio": storybookAspectRatio(document.format) } as CSSProperties}>
-      <button className="reader-arrow" type="button" aria-label="이전 쪽" disabled={viewIndex === 0} onClick={() => navigate(-1)}>‹</button>
-      <div className={`reader-spread${twoUp ? "" : " is-cover"}`} onPointerDown={event => { swipe.current = { x: event.clientX, y: event.clientY }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerCancel={() => { swipe.current = null; }} onPointerUp={event => { const start = swipe.current; swipe.current = null; if (start && Math.abs(event.clientX - start.x) > 45 && Math.abs(event.clientX - start.x) > Math.abs(event.clientY - start.y) * 1.5) navigate(event.clientX < start.x ? 1 : -1); }}>
-        {twoUp ? <>{pageView(view.pages[0], "reader-left")}{pageView(view.pages[1], "reader-right")}</> : pageView(view.pages[0], "reader-right")}
-        {turn && twoUp && <div key={`${turn.page}-${turn.direction}`} aria-hidden="true" className={`reader-turn ${turn.direction > 0 ? "turn-forward" : "turn-back"}`}>{pageView(turn.page)}</div>}
-      </div>
-      <button className="reader-arrow" type="button" aria-label="다음 쪽" disabled={viewIndex === views.length - 1} onClick={() => navigate(1)}>›</button>
-    </div>
-    <footer aria-live="polite">{view.label} · {viewIndex + 1} / {views.length} <small>화살표·키보드·손가락으로 책장을 넘겨요</small></footer>
+    <BookFlip document={document} renderContent={pageContent} onChange={onSpread} maxHeight="calc(100dvh - 170px)" />
+    <footer aria-live="polite">{position ? `${position.spread.label} · ${position.index + 1} / ${position.total}` : ""} <small>화살표·키보드·손가락으로 책장을 넘겨요</small></footer>
   </main>;
 }

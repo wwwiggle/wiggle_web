@@ -1,10 +1,14 @@
 export const STORYBOOK_SCHEMA_VERSION = 1;
 // Student authoring limit only; imported PDFs have no page-count ceiling.
 export const MAX_STORYBOOK_PAGES = 131; // One cover and up to 130 inner pages.
+/** @deprecated 2026-11-02부터 최소 쪽 수는 표지를 뺀 내지 기준이다(MIN_STORYBOOK_INNER_PAGES). */
 export const MIN_STORYBOOK_PAGES = 24;
-export function storybookCompletionError(title: string, pageCount: number, student = true) {
+/** 표지 PDF는 따로, 내지 PDF는 최소 24쪽(2026-11-02 사용자 결정). 앞·뒤표지를 뺀 쪽 수다. */
+export const MIN_STORYBOOK_INNER_PAGES = 24;
+/** innerPageCount = 앞·뒤표지를 뺀 쪽 수(lib/storybook-structure.ts innerPageCount). */
+export function storybookCompletionError(title: string, innerPageCount: number, student = true) {
   if (!title.trim() || ["나의 새 그림책", "나의 그림책"].includes(title.trim())) return "그림책 제목을 직접 지어 주세요. 제목을 정해야 완성할 수 있어요.";
-  if (student && pageCount < MIN_STORYBOOK_PAGES) return `표지를 포함해 최소 ${MIN_STORYBOOK_PAGES}페이지가 필요해요. 지금은 ${pageCount}페이지예요.`;
+  if (student && innerPageCount < MIN_STORYBOOK_INNER_PAGES) return `앞뒤 표지를 빼고 내지가 최소 ${MIN_STORYBOOK_INNER_PAGES}쪽 있어야 해요. 지금은 ${innerPageCount}쪽이에요.`;
   return "";
 }
 // Pictures have no per-page count quota. Bound serialized metadata, not children's pictures.

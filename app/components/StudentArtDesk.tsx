@@ -51,7 +51,7 @@ function ArtworkCard({ artwork }: { artwork: DeskArtwork }) {
       </span>
       {/* 시안대로 제목·날짜는 왼쪽, 행동은 같은 줄 오른쪽이다. 세로로 쌓으면 카드가 길어져
           한 줄에 네 장이 들어가지 않는다. */}
-      <span className="desk-art-go">{locked ? <>🔒 {PAID_PLAN_LABEL}</> : <>{drawing ? "이어 그리기" : "그림 보기"} <span aria-hidden="true">›</span></>}</span>
+      <span className="desk-art-go">{locked ? <small className="paid-lock-badge"><span aria-hidden="true">🔒</span> {PAID_PLAN_LABEL}</small> : <>{drawing ? "이어 그리기" : "그림 보기"} <span aria-hidden="true">›</span></>}</span>
     </span>
   </Card>;
 }
@@ -136,7 +136,7 @@ export function StudentArtDesk({ nickname, artworks, artworkTotal }: { nickname:
         <section className="desk-section" aria-labelledby="desk-art-title">
           <div className="desk-section-head">
             <h2 id="desk-art-title"><img src="/student-desk/icon-my-art.svg" alt="" aria-hidden="true" width={28} height={28} />내 그림</h2>
-            {artworkTotal > shown.length && (DRAWING_LOCKED ? <PaidLock className="desk-more" badge={false}>🔒 내 그림 모두 보기 ({artworkTotal}장)</PaidLock> : <a className="desk-more" href="/student/archive">내 그림 모두 보기 ({artworkTotal}장)</a>)}
+            {artworkTotal > shown.length && (DRAWING_LOCKED ? <PaidLock className="desk-more">내 그림 모두 보기 ({artworkTotal}장)</PaidLock> : <a className="desk-more" href="/student/archive">내 그림 모두 보기 ({artworkTotal}장)</a>)}
           </div>
           <ul className="desk-art-row">
             {/* 모든 화면 크기에서 새 그림이 시각·탭 순서의 맨 앞이다. */}

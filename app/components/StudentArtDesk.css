@@ -164,3 +164,7 @@
   .desk-new-card { min-height: 150px; }
   .desk-art-paper { aspect-ratio: 16 / 9; }
 }
+
+/* 유료 요금제 잠금 배지(2026-11-02): 「모두 보기」 줄과 카드 아래쪽에서 글자와 한 줄로 또렷하게. */
+.desk-more.paid-lock { gap: 8px; }
+.desk-more .paid-lock-badge, .desk-art-go .paid-lock-badge { margin-top: 0; }
