@@ -6,7 +6,8 @@ import "./book-workflow.css";
 import "./pdf-resize-tool.css";
 
 const PRESETS = [
-  { id: "sweetbook", label: "스위트북 스퀘어북 내지 243×248 + 도련 3mm", widthMm: 243, heightMm: 248, bleedMm: 3 },
+  // 2026-11-03 사용자 결정: 스위트북은 '늘리기 + 도련 끝'. 실제 210×210 그림책에서 채우기는 모서리 쪽 번호를 재단선에 걸었다.
+  { id: "sweetbook", label: "스위트북 스퀘어북 내지 243×248 + 도련 3mm", widthMm: 243, heightMm: 248, bleedMm: 3, mode: "stretch", placeInto: "bleed" },
   { id: "square210", label: "정사각 210×210", widthMm: 210, heightMm: 210, bleedMm: 0 },
   { id: "a4", label: "A4 세로 210×297", widthMm: 210, heightMm: 297, bleedMm: 0 },
   { id: "a5", label: "A5 세로 148×210", widthMm: 148, heightMm: 210, bleedMm: 0 },
@@ -15,10 +16,12 @@ const PRESETS = [
 const MODES: { value: PdfResizeMode; label: string; hint: string }[] = [
   { value: "fit", label: "맞춤", hint: "그림을 하나도 자르지 않고 같은 비율로 키우거나 줄입니다. 비율이 다르면 빈칸이 생깁니다." },
   { value: "fill", label: "채우기", hint: "빈칸 없이 같은 비율로 채웁니다. 비율이 다르면 가장자리가 잘립니다." },
-  { value: "stretch", label: "늘리기", hint: "가로·세로를 따로 맞춰 꽉 채웁니다. 비율이 다르면 그림이 조금 찌그러집니다." },
+  { value: "stretch", label: "늘리기", hint: "가로·세로를 따로 맞춰 꽉 채웁니다. 비율이 다르면 그림이 조금 눌립니다. 비율 차이가 작을 때(몇 %) 알맞습니다." },
 ];
 type SourceInfo = { name: string; bytes: Uint8Array; pageCount: number; sizes: string };
 const fileSize = (bytes: number) => bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 1024))}KB` : `${(bytes / 1024 / 1024).toFixed(2)}MB`;
+/** Largest x/y scale mismatch across converted pages, in percent. */
+const squashPercent = (pages: PdfResizeResult["pages"]) => Math.max(0, ...pages.map((p) => Math.abs(p.scale[0] / p.scale[1] - 1) * 100));
 const sides = (v: { left: number; right: number; top: number; bottom: number }) => v.left + v.right + v.top + v.bottom === 0 ? "없음" : `좌 ${v.left} · 우 ${v.right} · 위 ${v.top} · 아래 ${v.bottom}`;
 
 // One open pdf.js document per preview side, kept while its bytes stay the same so changing the page does not re-read a large file.
@@ -72,8 +75,8 @@ export function PdfResizeTool() {
   const [source, setSource] = useState<SourceInfo | null>(null);
   const [preset, setPreset] = useState<(typeof PRESETS)[number]["id"]>("sweetbook");
   const [widthMm, setWidthMm] = useState("243"), [heightMm, setHeightMm] = useState("248"), [bleedMm, setBleedMm] = useState("3");
-  const [mode, setMode] = useState<PdfResizeMode>("fit");
-  const [placeInto, setPlaceInto] = useState<"trim" | "bleed">("trim");
+  const [mode, setMode] = useState<PdfResizeMode>("stretch");
+  const [placeInto, setPlaceInto] = useState<"trim" | "bleed">("bleed");
   const [sourceBleed, setSourceBleed] = useState<"keep" | "clip">("keep");
   const [background, setBackground] = useState("#ffffff"), [noBackground, setNoBackground] = useState(false);
   const [pageRange, setPageRange] = useState("");
@@ -94,6 +97,7 @@ export function PdfResizeTool() {
     setPreset(id);
     const chosen = PRESETS.find((p) => p.id === id);
     if (chosen && id !== "custom") { setWidthMm(String(chosen.widthMm)); setHeightMm(String(chosen.heightMm)); setBleedMm(String(chosen.bleedMm)); }
+    if (chosen && "mode" in chosen) { setMode(chosen.mode); setPlaceInto(chosen.placeInto); }
   }
 
   async function chooseFile(file: File | undefined) {
@@ -189,6 +193,7 @@ export function PdfResizeTool() {
         <thead><tr><th>쪽</th><th>원본</th><th>배율</th><th>그림 크기</th><th>재단으로 잘리는 원본(mm)</th><th>빈칸(mm)</th></tr></thead>
         <tbody>{result.pages.map((p) => <tr key={p.page}><td>{p.page}{p.rotation ? ` (${p.rotation}°)` : ""}</td><td>{p.sourceMm.join("×")}</td><td>{p.scale[0] === p.scale[1] ? p.scale[0] : p.scale.join(" / ")}</td><td>{p.placedMm.join("×")}</td><td>{sides(p.cutSourceMm)}</td><td>{sides(p.gapMm)}{p.droppedAnnotations ? ` · 링크 ${p.droppedAnnotations}개 제거` : ""}</td></tr>)}</tbody>
       </table></div>
+      {squashPercent(result.pages) > 3 && <p className="book-notice" role="note">그림이 가로·세로 비율로 최대 {squashPercent(result.pages).toFixed(1)}% 눌려요. 눈에 띌 수 있으니 ‘맞춤’이나 ‘채우기’도 비교해 보세요.</p>}
       <p className="book-muted">배율이 1보다 크면 사진의 실제 해상도(ppi)가 그만큼 낮아지고, 작으면 높아집니다. 사진 데이터 자체는 바뀌지 않습니다.</p>
     </section>}
   </main>;

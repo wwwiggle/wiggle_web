@@ -153,6 +153,19 @@ try {
   await choose(samplePath);
   await waitFor(cdp, s, "/3쪽 · 210×210mm 3쪽/.test(document.body.innerText) && __ui.status() === ''", "올바른 파일로 회복");
 
+  // 기본값(2026-11-03 사용자 결정): 스위트북 + 늘리기 + 도련 끝. 2% 남짓 눌림이라 경고는 없다.
+  assert.deepEqual(await evaluate(cdp, s, "['mode', 'into'].map((n) => [...document.querySelectorAll('input[name=' + n + ']')].findIndex((r) => r.checked))"), [2, 1]);
+  await evaluate(cdp, s, "__ui.convert(), true");
+  await waitFor(cdp, s, "/3\\/3쪽을 바꿨어요/.test(__ui.status())", "기본값 변환");
+  assert.deepEqual(await evaluate(cdp, s, "__ui.row()"), ["1", "210×210", "1.1857 / 1.2095", "249×254", "좌 2.53 · 우 2.53 · 위 2.48 · 아래 2.48", "없음"]);
+  assert.equal(await evaluate(cdp, s, "document.querySelector('[role=note]')"), null, "2% 남짓은 경고하지 않는다");
+  // 많이 눌리면 경고한다 (210×210 → 300×210 늘리기)
+  await evaluate(cdp, s, "__ui.set(__ui.input('가로'), '300'), __ui.set(__ui.input('세로'), '210'), __ui.set(__ui.input('도련'), '0'), __ui.convert(), true");
+  await waitFor(cdp, s, "/42\\.9% 눌려요/.test(document.querySelector('[role=note]')?.textContent ?? '')", "눌림 경고");
+  // 스위트북을 다시 고르면 크기와 방식이 함께 돌아온다
+  await evaluate(cdp, s, "__ui.radio('mode', 0); __ui.radio('into', 0); __ui.set(__ui.input('판형'), 'sweetbook'); true");
+  assert.deepEqual(await evaluate(cdp, s, "[['가로','세로','도련'].map((l) => __ui.input(l).value), ['mode', 'into'].map((n) => [...document.querySelectorAll('input[name=' + n + ']')].findIndex((r) => r.checked))]"), [["243", "248", "3"], [2, 1]]);
+
   // 판형 고정본과 직접 입력
   await evaluate(cdp, s, "__ui.set(__ui.input('판형'), 'square210'), true");
   assert.deepEqual(await evaluate(cdp, s, "['가로','세로','도련'].map((l) => __ui.input(l).value)"), ["210", "210", "0"]);
@@ -208,7 +221,7 @@ try {
     const shot = await cdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true }, s);
     writeFileSync(resolve(process.env.PDF_RESIZE_SCREENSHOTS, "pdf-resize-1440x900.png"), Buffer.from(shot.data, "base64"));
   }
-  console.log(`PASS 1440×900: 잘못된·손상·암호 파일 안내와 회복, 판형 고정본·직접 입력, 방식 4조합 표 값, 배경 끄기, 미리보기 쪽 바꾸기, 나란한 미리보기, Tab ${reached.size}곳 초점 테두리`);
+  console.log(`PASS 1440×900: 기본값 늘리기·도련 끝, 눌림 경고, 잘못된·손상·암호 파일 안내와 회복, 판형 고정본·직접 입력, 방식 4조합 표 값, 배경 끄기, 미리보기 쪽 바꾸기, 나란한 미리보기, Tab ${reached.size}곳 초점 테두리`);
 
   if (BIG) {
     await evaluate(cdp, s, "location.reload(), true"); await sleep(500);
