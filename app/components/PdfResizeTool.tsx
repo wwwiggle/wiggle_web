@@ -1,19 +1,20 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from "pdfjs-dist";
-import type { PdfResizeMode, PdfResizeResult } from "@/lib/pdf-resize";
+import type { PdfResizeMode, PdfResizePlaceInto, PdfResizeResult } from "@/lib/pdf-resize";
 import "./book-workflow.css";
 import "./pdf-resize-tool.css";
 
 const PRESETS = [
-  // 2026-11-03 사용자 결정: 스위트북은 '늘리기 + 도련 끝'. 실제 210×210 그림책에서 채우기는 모서리 쪽 번호를 재단선에 걸었다.
-  { id: "sweetbook", label: "스위트북 스퀘어북 내지 243×248 + 도련 3mm", widthMm: 243, heightMm: 248, bleedMm: 3, mode: "stretch", placeInto: "bleed" },
+  // 2026-11-03 사용자 결정: 방식은 PDF를 보고 자동으로 고른다(210×210이면 늘리기 + 도련 끝). lib/pdf-resize.ts AUTO_STRETCH_LIMIT_PERCENT 참고.
+  { id: "sweetbook", label: "스위트북 스퀘어북 내지 243×248 + 도련 3mm", widthMm: 243, heightMm: 248, bleedMm: 3, mode: "auto", placeInto: "auto" },
   { id: "square210", label: "정사각 210×210", widthMm: 210, heightMm: 210, bleedMm: 0 },
   { id: "a4", label: "A4 세로 210×297", widthMm: 210, heightMm: 297, bleedMm: 0 },
   { id: "a5", label: "A5 세로 148×210", widthMm: 148, heightMm: 210, bleedMm: 0 },
   { id: "custom", label: "직접 입력", widthMm: 0, heightMm: 0, bleedMm: 0 },
 ] as const;
-const MODES: { value: PdfResizeMode; label: string; hint: string }[] = [
+const MODES: { value: PdfResizeMode | "auto"; label: string; hint: string }[] = [
+  { value: "auto", label: "자동 (권장)", hint: "쪽마다 골라요. 모양 차이가 3% 이하면 늘리기(눈에 안 띄고 자르는 곳이 거의 없음), 넘으면 맞춤(자르지 않음)." },
   { value: "fit", label: "맞춤", hint: "그림을 하나도 자르지 않고 같은 비율로 키우거나 줄입니다. 비율이 다르면 빈칸이 생깁니다." },
   { value: "fill", label: "채우기", hint: "빈칸 없이 같은 비율로 채웁니다. 비율이 다르면 가장자리가 잘립니다." },
   { value: "stretch", label: "늘리기", hint: "가로·세로를 따로 맞춰 꽉 채웁니다. 비율이 다르면 그림이 조금 눌립니다. 비율 차이가 작을 때(몇 %) 알맞습니다." },
@@ -21,6 +22,8 @@ const MODES: { value: PdfResizeMode; label: string; hint: string }[] = [
 type SourceInfo = { name: string; bytes: Uint8Array; pageCount: number; sizes: string };
 const fileSize = (bytes: number) => bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 1024))}KB` : `${(bytes / 1024 / 1024).toFixed(2)}MB`;
 /** Largest x/y scale mismatch across converted pages, in percent. */
+const MODE_LABEL: Record<PdfResizeMode, string> = { fit: "맞춤", fill: "채우기", stretch: "늘리기" };
+const PLACE_LABEL: Record<PdfResizePlaceInto, string> = { trim: "재단선", bleed: "도련 끝" };
 const squashPercent = (pages: PdfResizeResult["pages"]) => Math.max(0, ...pages.map((p) => Math.abs(p.scale[0] / p.scale[1] - 1) * 100));
 const sides = (v: { left: number; right: number; top: number; bottom: number }) => v.left + v.right + v.top + v.bottom === 0 ? "없음" : `좌 ${v.left} · 우 ${v.right} · 위 ${v.top} · 아래 ${v.bottom}`;
 
@@ -75,8 +78,8 @@ export function PdfResizeTool() {
   const [source, setSource] = useState<SourceInfo | null>(null);
   const [preset, setPreset] = useState<(typeof PRESETS)[number]["id"]>("sweetbook");
   const [widthMm, setWidthMm] = useState("243"), [heightMm, setHeightMm] = useState("248"), [bleedMm, setBleedMm] = useState("3");
-  const [mode, setMode] = useState<PdfResizeMode>("stretch");
-  const [placeInto, setPlaceInto] = useState<"trim" | "bleed">("bleed");
+  const [mode, setMode] = useState<PdfResizeMode | "auto">("auto");
+  const [placeInto, setPlaceInto] = useState<PdfResizePlaceInto | "auto">("auto");
   const [sourceBleed, setSourceBleed] = useState<"keep" | "clip">("keep");
   const [background, setBackground] = useState("#ffffff"), [noBackground, setNoBackground] = useState(false);
   const [pageRange, setPageRange] = useState("");
@@ -161,6 +164,7 @@ export function PdfResizeTool() {
         {MODES.map((m) => <label key={m.value}><input type="radio" name="mode" checked={mode === m.value} onChange={() => { setMode(m.value); changed(); }} /><span><b>{m.label}</b><small>{m.hint}</small></span></label>)}
       </fieldset>
       <fieldset className="pdf-resize-choice"><legend>원본 크기를 맞출 선</legend>
+        <label><input type="radio" name="into" checked={placeInto === "auto"} onChange={() => { setPlaceInto("auto"); changed(); }} /><span><b>자동 (권장)</b><small>원본에 도련 그림이 있으면 재단선에 맞추고 그 그림을 살려요. 없으면 도련 끝까지 채워요. 단, 맞춤일 때는 아무것도 잘리지 않게 재단선까지만 넣어요.</small></span></label>
         <label><input type="radio" name="into" checked={placeInto === "trim"} onChange={() => { setPlaceInto("trim"); changed(); }} /><span><b>재단선</b><small>원본 재단 크기를 새 재단 크기에 맞춥니다.</small></span></label>
         <label><input type="radio" name="into" checked={placeInto === "bleed"} onChange={() => { setPlaceInto("bleed"); changed(); }} /><span><b>도련 끝</b><small>도련 없는 원본을 도련까지 채울 때. 재단하면 도련만큼 더 잘립니다.</small></span></label>
       </fieldset>
@@ -190,8 +194,8 @@ export function PdfResizeTool() {
       <div className="book-section-heading"><h2>결과</h2><a className="button primary" href={result.url} download={result.fileName}>PDF 내려받기</a></div>
       <p className="book-muted">{result.fileName} · {fileSize(result.bytes.length)} (원본 {fileSize(source!.bytes.length)})</p>
       <div className="pdf-resize-table"><table>
-        <thead><tr><th>쪽</th><th>원본</th><th>배율</th><th>그림 크기</th><th>재단으로 잘리는 원본(mm)</th><th>빈칸(mm)</th></tr></thead>
-        <tbody>{result.pages.map((p) => <tr key={p.page}><td>{p.page}{p.rotation ? ` (${p.rotation}°)` : ""}</td><td>{p.sourceMm.join("×")}</td><td>{p.scale[0] === p.scale[1] ? p.scale[0] : p.scale.join(" / ")}</td><td>{p.placedMm.join("×")}</td><td>{sides(p.cutSourceMm)}</td><td>{sides(p.gapMm)}{p.droppedAnnotations ? ` · 링크 ${p.droppedAnnotations}개 제거` : ""}</td></tr>)}</tbody>
+        <thead><tr><th>쪽</th><th>원본</th><th>방식</th><th>배율</th><th>그림 크기</th><th>재단으로 잘리는 원본(mm)</th><th>빈칸(mm)</th></tr></thead>
+        <tbody>{result.pages.map((p) => <tr key={p.page}><td>{p.page}{p.rotation ? ` (${p.rotation}°)` : ""}</td><td>{p.sourceMm.join("×")}</td><td>{MODE_LABEL[p.mode]} · {PLACE_LABEL[p.placeInto]}</td><td>{p.scale[0] === p.scale[1] ? p.scale[0] : p.scale.join(" / ")}</td><td>{p.placedMm.join("×")}</td><td>{sides(p.cutSourceMm)}</td><td>{sides(p.gapMm)}{p.droppedAnnotations ? ` · 링크 ${p.droppedAnnotations}개 제거` : ""}</td></tr>)}</tbody>
       </table></div>
       {squashPercent(result.pages) > 3 && <p className="book-notice" role="note">그림이 가로·세로 비율로 최대 {squashPercent(result.pages).toFixed(1)}% 눌려요. 눈에 띌 수 있으니 ‘맞춤’이나 ‘채우기’도 비교해 보세요.</p>}
       <p className="book-muted">배율이 1보다 크면 사진의 실제 해상도(ppi)가 그만큼 낮아지고, 작으면 높아집니다. 사진 데이터 자체는 바뀌지 않습니다.</p>

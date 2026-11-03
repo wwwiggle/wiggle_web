@@ -21,6 +21,6 @@
 .pdf-resize-previews figcaption{font-size:13px;color:#66717b}
 .pdf-resize-empty{width:100%;aspect-ratio:1;display:grid;place-items:center;text-align:center;padding:16px;border:1px dashed #c9d0d4;border-radius:12px;font-size:13px;color:#66717b}
 .pdf-resize-table{overflow-x:auto;margin:12px 0}
-.pdf-resize-table table{border-collapse:collapse;width:100%;font-size:13px;min-width:620px}
+.pdf-resize-table table{border-collapse:collapse;width:100%;font-size:13px;min-width:720px}
 .pdf-resize-table th,.pdf-resize-table td{border-top:1px solid #e5e8ea;padding:8px 6px;text-align:left;vertical-align:top}
 @media(max-width:600px){.pdf-resize-tool{padding:16px 12px 40px}.pdf-resize-sizes{grid-template-columns:1fr}.pdf-resize-previews{grid-template-columns:1fr}.pdf-resize-tool .button{width:100%}}

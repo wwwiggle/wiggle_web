@@ -97,7 +97,7 @@ try {
     await waitFor(cdp, s, "/3쪽 · 210×210mm 3쪽/.test(document.body.innerText)", "원본 정보");
 
     // 스위트북 기본값 + 채우기 + 도련 끝까지
-    await evaluate(cdp, s, `(() => { const radio = (name, i) => document.querySelectorAll('input[name=' + name + ']')[i].click(); radio('mode', 1); radio('into', 1); return true; })()`);
+    await evaluate(cdp, s, `(() => { const radio = (name, i) => document.querySelectorAll('input[name=' + name + ']')[i].click(); radio('mode', 2); radio('into', 2); return true; })()`);
     await evaluate(cdp, s, "[...document.querySelectorAll('button')].find((b) => b.textContent === '판형 바꾸기').click(), true");
     await waitFor(cdp, s, "!!document.querySelector('a[download]')", "결과");
     const result = await evaluate(cdp, s, `(async () => {
@@ -117,7 +117,7 @@ try {
     })()`);
     assert.equal(result.overflow <= 0, true, `${width}×${height} 가로 넘침 ${result.overflow}px`);
     assert.deepEqual(result.small, [], `${width}×${height} 44px 미만 터치 목표`);
-    assert.ok(result.radios.length === 7 && result.radios.every((w) => w <= 24), `라디오 단추 너비 ${result.radios}`);
+    assert.ok(result.radios.length === 9 && result.radios.every((w) => w <= 24), `라디오 단추 너비 ${result.radios}`);
     assert.ok(result.choiceText.every((w) => w >= 180), `선택지 글 너비 ${result.choiceText}`);
     assert.ok(result.color <= 80, `색 고르기 너비 ${result.color}`);
     assert.equal(result.canvases.length, 2); assert.ok(result.canvases.every(([w, h]) => w > 100 && h > 100), "미리보기 두 장");
@@ -153,18 +153,18 @@ try {
   await choose(samplePath);
   await waitFor(cdp, s, "/3쪽 · 210×210mm 3쪽/.test(document.body.innerText) && __ui.status() === ''", "올바른 파일로 회복");
 
-  // 기본값(2026-11-03 사용자 결정): 스위트북 + 늘리기 + 도련 끝. 2% 남짓 눌림이라 경고는 없다.
-  assert.deepEqual(await evaluate(cdp, s, "['mode', 'into'].map((n) => [...document.querySelectorAll('input[name=' + n + ']')].findIndex((r) => r.checked))"), [2, 1]);
+  // 기본값(2026-11-03 사용자 결정): 스위트북 + 자동. 210×210이면 늘리기 + 도련 끝으로 골라지고, 2% 남짓 눌림이라 경고는 없다.
+  assert.deepEqual(await evaluate(cdp, s, "['mode', 'into'].map((n) => [...document.querySelectorAll('input[name=' + n + ']')].findIndex((r) => r.checked))"), [0, 0]);
   await evaluate(cdp, s, "__ui.convert(), true");
   await waitFor(cdp, s, "/3\\/3쪽을 바꿨어요/.test(__ui.status())", "기본값 변환");
-  assert.deepEqual(await evaluate(cdp, s, "__ui.row()"), ["1", "210×210", "1.1857 / 1.2095", "249×254", "좌 2.53 · 우 2.53 · 위 2.48 · 아래 2.48", "없음"]);
+  assert.deepEqual(await evaluate(cdp, s, "__ui.row()"), ["1", "210×210", "늘리기 · 도련 끝", "1.1857 / 1.2095", "249×254", "좌 2.53 · 우 2.53 · 위 2.48 · 아래 2.48", "없음"]);
   assert.equal(await evaluate(cdp, s, "document.querySelector('[role=note]')"), null, "2% 남짓은 경고하지 않는다");
   // 많이 눌리면 경고한다 (210×210 → 300×210 늘리기)
-  await evaluate(cdp, s, "__ui.set(__ui.input('가로'), '300'), __ui.set(__ui.input('세로'), '210'), __ui.set(__ui.input('도련'), '0'), __ui.convert(), true");
+  await evaluate(cdp, s, "__ui.radio('mode', 3), __ui.set(__ui.input('가로'), '300'), __ui.set(__ui.input('세로'), '210'), __ui.set(__ui.input('도련'), '0'), __ui.convert(), true");
   await waitFor(cdp, s, "/42\\.9% 눌려요/.test(document.querySelector('[role=note]')?.textContent ?? '')", "눌림 경고");
   // 스위트북을 다시 고르면 크기와 방식이 함께 돌아온다
-  await evaluate(cdp, s, "__ui.radio('mode', 0); __ui.radio('into', 0); __ui.set(__ui.input('판형'), 'sweetbook'); true");
-  assert.deepEqual(await evaluate(cdp, s, "[['가로','세로','도련'].map((l) => __ui.input(l).value), ['mode', 'into'].map((n) => [...document.querySelectorAll('input[name=' + n + ']')].findIndex((r) => r.checked))]"), [["243", "248", "3"], [2, 1]]);
+  await evaluate(cdp, s, "__ui.radio('mode', 1); __ui.radio('into', 1); __ui.set(__ui.input('판형'), 'sweetbook'); true");
+  assert.deepEqual(await evaluate(cdp, s, "[['가로','세로','도련'].map((l) => __ui.input(l).value), ['mode', 'into'].map((n) => [...document.querySelectorAll('input[name=' + n + ']')].findIndex((r) => r.checked))]"), [["243", "248", "3"], [0, 0]]);
 
   // 판형 고정본과 직접 입력
   await evaluate(cdp, s, "__ui.set(__ui.input('판형'), 'square210'), true");
@@ -174,15 +174,15 @@ try {
   await evaluate(cdp, s, "__ui.set(__ui.input('판형'), 'sweetbook'), true");
 
   // 방식 조합: 표 값이 lib/pdf-resize.ts 계산과 같다 (210×210 → 243×248 + 도련 3)
-  for (const [mode, into, scale, placed, cut, gap] of [
-    [0, 0, "1.1571", "243×243", "없음", "좌 0 · 우 0 · 위 2.5 · 아래 2.5"],
-    [1, 0, "1.181", "248×248", "좌 2.12 · 우 2.12 · 위 0 · 아래 0", "없음"],
-    [1, 1, "1.2095", "254×254", "좌 4.55 · 우 4.55 · 위 2.48 · 아래 2.48", "없음"],
-    [2, 0, "1.1571 / 1.181", "243×248", "없음", "없음"],
+  for (const [mode, into, method, scale, placed, cut, gap] of [
+    [1, 1, "맞춤 · 재단선", "1.1571", "243×243", "없음", "좌 0 · 우 0 · 위 2.5 · 아래 2.5"],
+    [2, 1, "채우기 · 재단선", "1.181", "248×248", "좌 2.12 · 우 2.12 · 위 0 · 아래 0", "없음"],
+    [2, 2, "채우기 · 도련 끝", "1.2095", "254×254", "좌 4.55 · 우 4.55 · 위 2.48 · 아래 2.48", "없음"],
+    [3, 1, "늘리기 · 재단선", "1.1571 / 1.181", "243×248", "없음", "없음"],
   ]) {
     await evaluate(cdp, s, `__ui.radio('mode', ${mode}); __ui.radio('into', ${into}); __ui.convert(); true`);
     await waitFor(cdp, s, "/3\\/3쪽을 바꿨어요/.test(__ui.status()) && document.querySelectorAll('.pdf-resize-previews canvas').length === 2", `방식 ${mode}/${into}`);
-    assert.deepEqual(await evaluate(cdp, s, "__ui.row()"), ["1", "210×210", scale, placed, cut, gap]);
+    assert.deepEqual(await evaluate(cdp, s, "__ui.row()"), ["1", "210×210", method, scale, placed, cut, gap]);
   }
 
   // 배경 끄기
@@ -221,7 +221,7 @@ try {
     const shot = await cdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true }, s);
     writeFileSync(resolve(process.env.PDF_RESIZE_SCREENSHOTS, "pdf-resize-1440x900.png"), Buffer.from(shot.data, "base64"));
   }
-  console.log(`PASS 1440×900: 기본값 늘리기·도련 끝, 눌림 경고, 잘못된·손상·암호 파일 안내와 회복, 판형 고정본·직접 입력, 방식 4조합 표 값, 배경 끄기, 미리보기 쪽 바꾸기, 나란한 미리보기, Tab ${reached.size}곳 초점 테두리`);
+  console.log(`PASS 1440×900: 기본값 자동(→ 늘리기·도련 끝), 눌림 경고, 잘못된·손상·암호 파일 안내와 회복, 판형 고정본·직접 입력, 방식 4조합 표 값, 배경 끄기, 미리보기 쪽 바꾸기, 나란한 미리보기, Tab ${reached.size}곳 초점 테두리`);
 
   if (BIG) {
     await evaluate(cdp, s, "location.reload(), true"); await sleep(500);

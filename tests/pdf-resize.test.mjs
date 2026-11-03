@@ -104,11 +104,11 @@ test("243×248 (+3mm art bleed) → 210×210 shrinks whole art with no cut; gaps
 
 test("fit and fill to the trim leave background in the bleed or cut the long side", async () => {
   const source = await samplePdf(210, 210);
-  const fit = await resizePdf(source, { widthMm: 243, heightMm: 248, bleedMm: 3, mode: "fit" });
+  const fit = await resizePdf(source, { widthMm: 243, heightMm: 248, bleedMm: 3, mode: "fit", placeInto: "trim" });
   assert.deepEqual(fit.pages[0].gapMm, { left: 0, right: 0, top: 2.5, bottom: 2.5 });
   const fitRender = await render(fit.bytes);
   assert.ok(isWhite(pixel(fitRender, 124.5, 4)) && !isWhite(pixel(fitRender, 124.5, 7)), "white band below the top trim, art after it");
-  const fill = await resizePdf(source, { widthMm: 243, heightMm: 248, bleedMm: 3, mode: "fill", background: "#ff00ff" });
+  const fill = await resizePdf(source, { widthMm: 243, heightMm: 248, bleedMm: 3, mode: "fill", placeInto: "trim", background: "#ff00ff" });
   assert.deepEqual(fill.pages[0].cutSourceMm, { left: 2.12, right: 2.12, top: 0, bottom: 0 });
   assert.deepEqual(pixel(await render(fill.bytes), 124.5, 1), [255, 0, 255], "uncovered bleed shows the chosen background");
 });
@@ -218,4 +218,27 @@ test("a content stream shared with an untouched page is kept; otherwise it is dr
   for (const n of [1, 2]) assert.deepEqual(pixel(await render(both.bytes, n, 1), 25, 45), [255, 0, 0]);
   const objects = (bytes) => PDFDocument.load(bytes).then((d) => d.context.enumerateIndirectObjects().length);
   assert.ok(await objects(both.bytes) <= (await objects(source)) + 4, "no orphaned copies of the old content");
+});
+
+test("auto picks per page: stretch for small shape changes, fit for large ones; bleed edge unless the page brings its own bleed", async () => {
+  const sweetbook = { widthMm: 243, heightMm: 248, bleedMm: 3 };
+  const square = await resizePdf(await samplePdf(210, 210), sweetbook);
+  assert.deepEqual([square.pages[0].mode, square.pages[0].placeInto, square.pages[0].scale], ["stretch", "bleed", [1.1857, 1.2095]]);
+  assert.deepEqual(square.pages[0].gapMm, { left: 0, right: 0, top: 0, bottom: 0 });
+
+  const a4 = await resizePdf(await samplePdf(210, 297), sweetbook);
+  assert.deepEqual([a4.pages[0].mode, a4.pages[0].placeInto], ["fit", "trim"], "A4 → square-ish would squash 29%, so fit inside the trim and cut nothing");
+  assert.deepEqual(a4.pages[0].cutSourceMm, { left: 0, right: 0, top: 0, bottom: 0 });
+
+  const printReady = await samplePdf(243, 248, 3);
+  const shrunk = await resizePdf(printReady, { widthMm: 210, heightMm: 210, bleedMm: 3 });
+  assert.deepEqual([shrunk.pages[0].mode, shrunk.pages[0].placeInto], ["stretch", "trim"], "own bleed art fills the new bleed");
+  const clipped = await resizePdf(printReady, { widthMm: 210, heightMm: 210, bleedMm: 3, sourceBleed: "clip" });
+  assert.equal(clipped.pages[0].placeInto, "bleed");
+
+  const mixed = await PDFDocument.create();
+  for (const [w, h] of [[210, 210], [210, 297]]) mixed.addPage([w * PT, h * PT]).drawRectangle({ x: 0, y: 0, width: w * PT, height: h * PT, color: rgb(0, 0.5, 1) });
+  const both = await resizePdf(await mixed.save(), sweetbook);
+  assert.deepEqual(both.pages.map((p) => p.mode), ["stretch", "fit"]);
+  for (const page of (await PDFDocument.load(both.bytes)).getPages()) assert.deepEqual(boxMm(page.getMediaBox()), [0, 0, 249, 254]);
 });

@@ -12,15 +12,28 @@ const FORM_NAME = "WiggleResizedPage";
 
 /** fit: whole trim visible, uniform scale. fill: no gaps, uniform scale, edges cut. stretch: separate x/y scale. */
 export type PdfResizeMode = "fit" | "fill" | "stretch";
+export type PdfResizePlaceInto = "trim" | "bleed";
+
+/**
+ * "auto" stretches when the shapes differ by at most this much (invisible on children's drawings, and nothing near
+ * the edge is cut); beyond it, fit, which never cuts. Measured on a real 210×210 book going to 243×248+3 (2.1%):
+ * fill cut page numbers at the corners and fit left white bands inside the trim (2026-11-03).
+ */
+export const AUTO_STRETCH_LIMIT_PERCENT = 3;
 
 export type PdfResizeOptions = {
   widthMm: number;
   heightMm: number;
   /** Bleed added on every side of the output trim box. */
   bleedMm?: number;
-  mode?: PdfResizeMode;
-  /** Where the source trim box lands: inside the output trim box, or stretched to the outer bleed edge. */
-  placeInto?: "trim" | "bleed";
+  /** Default "auto": per page, stretch within AUTO_STRETCH_LIMIT_PERCENT, else fit. */
+  mode?: PdfResizeMode | "auto";
+  /**
+   * Where the source trim box lands: inside the output trim box, or stretched to the outer bleed edge.
+   * Default "auto": the trim when the page brings its own bleed art (kept) or the mode is fit (so fit never cuts),
+   * otherwise the bleed edge.
+   */
+  placeInto?: PdfResizePlaceInto | "auto";
   /** "keep" shows the source's own bleed art around its trim box when there is room; "clip" cuts at the source trim. */
   sourceBleed?: "keep" | "clip";
   /** Fill colour for the whole output page behind the content (#rrggbb), or null for none. */
@@ -33,6 +46,9 @@ export type PdfResizePageReport = {
   page: number;
   sourceMm: [number, number];
   rotation: number;
+  /** What was used on this page (resolved from "auto"). */
+  mode: PdfResizeMode;
+  placeInto: PdfResizePlaceInto;
   scale: [number, number];
   /** Size of the source trim box after scaling. */
   placedMm: [number, number];
@@ -73,10 +89,10 @@ export function parsePageRange(text: string, pageCount: number) {
 }
 
 export async function resizePdf(input: Uint8Array | ArrayBuffer, options: PdfResizeOptions): Promise<PdfResizeResult> {
-  const { widthMm, heightMm, bleedMm = 0, mode = "fit", placeInto = "trim", sourceBleed = "keep", background = "#ffffff" } = options;
+  const { widthMm, heightMm, bleedMm = 0, mode = "auto", placeInto = "auto", sourceBleed = "keep", background = "#ffffff" } = options;
   if (![widthMm, heightMm].every((v) => Number.isFinite(v) && v >= 10 && v <= 2000)) throw new Error("가로·세로는 10~2000mm로 넣어 주세요.");
   if (!Number.isFinite(bleedMm) || bleedMm < 0 || bleedMm > 20) throw new Error("도련은 0~20mm로 넣어 주세요.");
-  if (!["fit", "fill", "stretch"].includes(mode) || !["trim", "bleed"].includes(placeInto) || !["keep", "clip"].includes(sourceBleed)) throw new Error("변환 방식을 확인해 주세요.");
+  if (!["auto", "fit", "fill", "stretch"].includes(mode) || !["auto", "trim", "bleed"].includes(placeInto) || !["keep", "clip"].includes(sourceBleed)) throw new Error("변환 방식을 확인해 주세요.");
   const fill = background === null ? "" : rgbFromHex(background);
 
   let pdf: PDFDocument;
@@ -127,7 +143,7 @@ function decodedContents(pdf: PDFDocument, page: PDFPage, pageNumber: number) {
   return joined;
 }
 
-function resizePage(pdf: PDFDocument, page: PDFPage, pageNumber: number, o: { W: number; H: number; B: number; mode: PdfResizeMode; placeInto: "trim" | "bleed"; sourceBleed: "keep" | "clip"; fill: string }, replaced: PDFRef[]): PdfResizePageReport {
+function resizePage(pdf: PDFDocument, page: PDFPage, pageNumber: number, o: { W: number; H: number; B: number; mode: PdfResizeMode | "auto"; placeInto: PdfResizePlaceInto | "auto"; sourceBleed: "keep" | "clip"; fill: string }, replaced: PDFRef[]): PdfResizePageReport {
   const { W, H, B } = o, MW = W + 2 * B, MH = H + 2 * B;
   const unitValue = page.node.get(PDFName.of("UserUnit"));
   const unit = unitValue instanceof PDFNumber ? unitValue.asNumber() : 1;
@@ -136,10 +152,13 @@ function resizePage(pdf: PDFDocument, page: PDFPage, pageNumber: number, o: { W:
   if (rotation % 90) throw new Error(`${pageNumber}쪽의 회전 값(${rotation}°)을 읽지 못했어요.`);
   // Source sizes are in source units; the scale below converts them, so UserUnit only matters for reporting.
   const [sw, sh] = rotation % 180 ? [trim.height, trim.width] : [trim.width, trim.height];
-  const target = o.placeInto === "bleed" ? { x: 0, y: 0, w: MW, h: MH } : { x: B, y: B, w: W, h: H };
+  const ownBleed = o.sourceBleed === "keep" && [trim.x - crop.x, trim.y - crop.y, crop.x + crop.width - trim.x - trim.width, crop.y + crop.height - trim.y - trim.height].some((v) => v > 0.5);
+  const mode: PdfResizeMode = o.mode !== "auto" ? o.mode : Math.abs((W / sw) / (H / sh) - 1) * 100 <= AUTO_STRETCH_LIMIT_PERCENT ? "stretch" : "fit";
+  const placeInto: PdfResizePlaceInto = o.placeInto !== "auto" ? o.placeInto : B > 0 && !ownBleed && mode !== "fit" ? "bleed" : "trim";
+  const target = placeInto === "bleed" ? { x: 0, y: 0, w: MW, h: MH } : { x: B, y: B, w: W, h: H };
   let sx = target.w / sw, sy = target.h / sh;
-  if (o.mode === "fit") sx = sy = Math.min(sx, sy);
-  else if (o.mode === "fill") sx = sy = Math.max(sx, sy);
+  if (mode === "fit") sx = sy = Math.min(sx, sy);
+  else if (mode === "fill") sx = sy = Math.max(sx, sy);
   const ox = target.x + (target.w - sw * sx) / 2, oy = target.y + (target.h - sh * sy) / 2;
 
   // Source trim origin → (0,0), then bake the page /Rotate in (clockwise display rotation), then scale and place.
@@ -172,6 +191,8 @@ function resizePage(pdf: PDFDocument, page: PDFPage, pageNumber: number, o: { W:
     page: pageNumber,
     sourceMm: [mm(sw * unit), mm(sh * unit)],
     rotation,
+    mode,
+    placeInto,
     scale: [Math.round(sx / unit * 1e4) / 1e4, Math.round(sy / unit * 1e4) / 1e4],
     placedMm: [mm(placedW), mm(placedH)],
     cutSourceMm: { left: positive(-left / sx * unit), right: positive(-right / sx * unit), top: positive(-top / sy * unit), bottom: positive(-bottom / sy * unit) },
