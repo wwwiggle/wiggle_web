@@ -23,7 +23,12 @@ test("그림책 공방: 학생 화면은 첫 화면으로, 명단 없는 학급,
     assert.ok([307, 308].includes(response.status), path);
     assert.equal(new URL(response.headers.get("location"), "http://x").pathname, "/");
   }
-  assert.match(await (await server.fetch("/")).text(), /그림책 공방/);
+  // 첫 화면은 꿈틀 그림책(book.kkumtle.app)과 같은 상품 화면이고, 수업 코드 칸이 없다.
+  const landing = await (await server.fetch("/")).text();
+  assert.match(landing, /그림책 공방/);
+  assert.match(landing, /그림책 하드커버 스퀘어북/);
+  assert.match(landing, /href="\/teacher"[^>]*>그림책 만들기 시작</);
+  assert.doesNotMatch(landing, /수업 코드 입력/);
   // 학생 API는 기존 기기 저장 때문에 열어 둔다.
   assert.notEqual((await server.fetch("/api/student")).status, 307);
 

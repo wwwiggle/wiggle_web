@@ -3,10 +3,16 @@ import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
 import { InputModeTracker } from "./components/InputModeTracker";
+import { ShopFrame } from "./components/ShopFrame";
+import { studentAppEnabled } from "@/lib/product-mode";
+import "./shop.css";
 
 const title = "Wiggle — 함께 그리며 생각해요";
 const description =
   "아이가 그리고, AI는 묻습니다. 설치 없이 교실에서 쓰는 초등 그림 창작 코칭 웹앱";
+
+const STUDIO_TITLE = "꿈틀 그림책 — 학교 그림책 인쇄 주문";
+const STUDIO_DESCRIPTION = "아이들 그림 사진·스캔이나 PDF로 그림책을 만들어 하드커버 책으로 주문해요.";
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
@@ -16,10 +22,12 @@ export async function generateMetadata(): Promise<Metadata> {
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const metadataBase = new URL(`${protocol}://${host}`);
 
+  // 그림책 공방이면 탭 제목·소개를 꿈틀 그림책으로 바꾼다(링크 미리보기 그림은 아직 옛 대문이다).
+  const studio = !studentAppEnabled();
   return {
     metadataBase,
-    title: { default: title, template: "%s | Wiggle" },
-    description,
+    title: studio ? { default: STUDIO_TITLE, template: "%s | 꿈틀 그림책" } : { default: title, template: "%s | Wiggle" },
+    description: studio ? STUDIO_DESCRIPTION : description,
     icons: {
       // 브라우저 탭 아이콘은 손 흔드는 WIGGLE 마크다(2026-10-03 사용자 지정, 종전 크레용 그림 대체).
       // 원본 로고가 가로형이라 마크만 잘라 흰 바탕 정사각으로 올린다. app_icon.png는 제품 앱 아이콘이라 그대로 둔다.
@@ -51,9 +59,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const studio = !studentAppEnabled();
   return (
     <html lang="ko">
-      <body><InputModeTracker /><PresenceHeartbeat />{children}</body>
+      {/* 그림책 공방이면 몸통에 shop을 달아 꿈틀 그림책(book.kkumtle.app)과 같은 쇼핑몰 모양을 입힌다(app/shop.css). */}
+      {studio && <head><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" /></head>}
+      <body className={studio ? "shop" : undefined}><InputModeTracker /><PresenceHeartbeat />{studio ? <ShopFrame>{children}</ShopFrame> : children}</body>
     </html>
   );
 }

@@ -1,5 +1,6 @@
 import { Logo } from "./components/Logo";
 import { LandingCodeForm } from "./components/LandingCodeForm";
+import { StudioLanding } from "./components/StudioLanding";
 import { studentAppEnabled } from "@/lib/product-mode";
 
 /* 2026-09-07 오리 전시관 대문 (`docs/design-assets/gallery/selected-reference.png`).
@@ -11,13 +12,6 @@ const EXHIBITS = [
   { id: "house", alt: "크레용으로 그린 빨간 지붕 집과 꽃밭", mark: "/landing-gallery/icons/house.svg" },
 ];
 
-/* 그림책 공방(2026-11-04, lib/product-mode.ts): 학생 입장 대신 선생님이 책을 만들고 주문하는 길을 보인다. */
-const STUDIO_STEPS = [
-  { icon: "book-discover", title: "사진·스캔·PDF 올리기", body: "아이들 그림을 찍거나 스캔해 올리거나, 완성한 PDF를 그대로 올려요" },
-  { icon: "different-ideas", title: "그림책 편집", body: "쪽 순서를 바꾸고, 글과 그림을 더하고, 표지를 꾸며요" },
-  { icon: "question", title: "주문·결제", body: "하드커버 그림책으로 인쇄해 학교로 보내 드려요" },
-];
-
 const REASONS = [
   { icon: "different-ideas", title: "모두 다른 답", body: "같은 시작에서도 생각은 달라져요" },
   { icon: "question", title: "AI는 대신 그리지 않아요", body: "필요할 때만 질문으로 도와요" },
@@ -27,7 +21,8 @@ const REASONS = [
 export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const teacherAuthFailed = params.teacherAuth === "failed";
-  const studio = !studentAppEnabled();
+  // 그림책 공방(2026-11-04, lib/product-mode.ts): 학생 입장 대신 꿈틀 그림책 상품 화면을 보인다.
+  if (!studentAppEnabled()) return <StudioLanding teacherAuthFailed={teacherAuthFailed} />;
   return (
     <main className="landing gallery-landing">
       <nav className="topbar">
@@ -37,21 +32,15 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
             <circle cx="12" cy="8" r="4" />
             <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8" />
           </svg>
-          {studio ? "선생님 로그인" : "교사 수업 열기"}
+          교사 수업 열기
         </a>
       </nav>
 
       <section className="gallery-hero">
         <div className="gallery-copy">
-          {studio ? <>
-            <p className="eyebrow landing-eyebrow">꿈틀 그림책 공방 · 학교 그림책 인쇄</p>
-            <h1 className="landing-headline"><span>아이들 그림으로</span> <strong>진짜 그림책을 만들어요</strong></h1>
-            <p className="landing-subtitle">사진·스캔·PDF를 올려 편집하고, 하드커버 책으로 주문하세요.</p>
-          </> : <>
-            <p className="eyebrow landing-eyebrow">AI 그림 학습 · 교실 창작 코칭</p>
-            <h1 className="landing-headline"><span>오늘은</span> <strong>어떤 생각을 그려볼까요?</strong></h1>
-            <p className="landing-subtitle">함께 그리고, 서로의 생각을 발견하는 교실.</p>
-          </>}
+          <p className="eyebrow landing-eyebrow">AI 그림 학습 · 교실 창작 코칭</p>
+          <h1 className="landing-headline"><span>오늘은</span> <strong>어떤 생각을 그려볼까요?</strong></h1>
+          <p className="landing-subtitle">함께 그리고, 서로의 생각을 발견하는 교실.</p>
         </div>
 
         <div className="gallery-stage">
@@ -114,37 +103,22 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           />
 
           <div className="gallery-entry">
-            {studio ? <>
-              <div className="gallery-student-tag">
-                <img src="/landing-gallery/icons/star.svg" width={22} height={22} alt="" aria-hidden="true" />
-                <b>선생님</b>
-                <span>구글 계정으로 바로 시작해요</span>
-              </div>
-              <div className="landing-code-card studio-start-card">
-                <h2 className="landing-code-card-title">그림책 만들기</h2>
-                <ol className="studio-steps">
-                  {STUDIO_STEPS.map((step, index) => <li key={step.title}><b>{index + 1}. {step.title}</b><span>{step.body}</span></li>)}
-                </ol>
-                <a className="button primary full" href="/teacher">그림책 만들러 가기</a>
-              </div>
-            </> : <>
-              <div className="gallery-student-tag">
-                <img src="/landing-gallery/icons/star.svg" width={22} height={22} alt="" aria-hidden="true" />
-                <b>학생</b>
-                <span>수업 코드로 바로 참여해요</span>
-              </div>
-              <div className="landing-code-card">
-                <h2 className="landing-code-card-title">수업 코드 입력</h2>
-                <LandingCodeForm />
-              </div>
-              <p className="gallery-trust-note">
-                <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 3 5 6v5c0 4.8 2.9 8.2 7 10 4.1-1.8 7-5.2 7-10V6l-7-3Z" />
-                  <path d="m9 12 2 2 4-5" />
-                </svg>
-                학생 이메일 없이 안전하게
-              </p>
-            </>}
+            <div className="gallery-student-tag">
+              <img src="/landing-gallery/icons/star.svg" width={22} height={22} alt="" aria-hidden="true" />
+              <b>학생</b>
+              <span>수업 코드로 바로 참여해요</span>
+            </div>
+            <div className="landing-code-card">
+              <h2 className="landing-code-card-title">수업 코드 입력</h2>
+              <LandingCodeForm />
+            </div>
+            <p className="gallery-trust-note">
+              <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3 5 6v5c0 4.8 2.9 8.2 7 10 4.1-1.8 7-5.2 7-10V6l-7-3Z" />
+                <path d="m9 12 2 2 4-5" />
+              </svg>
+              학생 이메일 없이 안전하게
+            </p>
             {teacherAuthFailed && (
               <aside className="teacher-auth-notice" role="alert">
                 <b>구글 로그인이 되지 않았어요.</b>
@@ -160,10 +134,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
       </section>
 
       <section className="gallery-reasons" aria-labelledby="gallery-reasons-title">
-        <h2 id="gallery-reasons-title">{studio ? <>꿈틀 그림책이<br />하는 일</> : <>Wiggle이<br />다른 이유</>}</h2>
+        <h2 id="gallery-reasons-title">Wiggle이<br />다른 이유</h2>
         <ul>
-          {(studio ? STUDIO_STEPS : REASONS).map((reason) => (
-            <li key={reason.title}>
+          {REASONS.map((reason) => (
+            <li key={reason.icon}>
               <img src={`/landing-gallery/icons/${reason.icon}.svg`} width={26} height={26} alt="" aria-hidden="true" loading="lazy" />
               <div>
                 <b>{reason.title}</b>

@@ -1,0 +1,197 @@
+/* 그림책 공방 쇼핑몰 모양(2026-11-04). body.shop일 때만 쓴다(app/layout.tsx).
+   꿈틀 그림책(book.kkumtle.app, kkumtle-book app/globals.css 확정 시안 2차)과 같은 문법:
+   흰 바탕, 1px 선, 각진 모서리, 검정 주문 버튼. 초록은 브랜드 표시에만, 빨강은 결제 금액에만. */
+body.shop {
+  --shop-bg: #ffffff;
+  --shop-sheet: #f6f6f6;
+  --shop-line: #e5e5e5;
+  --shop-line-strong: #cfcfcf;
+  --shop-ink: #111111;
+  --shop-sub: #6b6b6b;
+  --shop-faint: #8a8a8a;
+  --shop-brand: #2e5f23;
+  --shop-price: #d93a26;
+  --shop-notice-bg: #fff8e5;
+  --shop-notice-ink: #8a5a00;
+  background: var(--shop-bg);
+  color: var(--shop-ink);
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+body.shop .num { font-variant-numeric: tabular-nums; }
+.shop-wrap { max-width: 1180px; margin: 0 auto; padding: 0 32px; }
+body.shop :focus-visible { outline: 2px solid var(--shop-brand); outline-offset: 2px; }
+
+/* 머리 */
+.shop-util { border-bottom: 1px solid var(--shop-line); font-size: 12px; color: var(--shop-sub); }
+.shop-util .shop-wrap { display: flex; justify-content: flex-end; gap: 14px; padding-block: 6px; }
+.shop-util a { color: inherit; text-decoration: none; }
+.shop-gnb { border-bottom: 1px solid var(--shop-line); background: #fff; }
+.shop-gnb .shop-wrap { display: flex; align-items: center; gap: 32px; min-height: 64px; }
+.shop-logo { display: inline-flex; align-items: center; gap: 8px; color: var(--shop-ink); text-decoration: none; font-size: 17px; font-weight: 800; letter-spacing: -0.03em; }
+.shop-logo img { width: 28px; height: 28px; }
+.shop-logo em { font-style: normal; color: var(--shop-brand); }
+.shop-gnb nav { display: flex; gap: 24px; }
+.shop-gnb nav a { color: var(--shop-ink); text-decoration: none; font-size: 15px; font-weight: 700; }
+.shop-gnb nav a:hover { text-decoration: underline; text-underline-offset: 6px; }
+.shop-pill { margin-left: auto; padding: 7px 14px; border: 1px solid var(--shop-line-strong); border-radius: 999px; color: var(--shop-ink); text-decoration: none; font-size: 12px; font-weight: 700; white-space: nowrap; }
+
+/* 바닥 */
+.shop-foot { margin-top: 64px; padding: 24px 0 32px; background: var(--shop-sheet); border-top: 1px solid var(--shop-line); font-size: 12px; color: var(--shop-sub); line-height: 1.8; }
+.shop-foot nav { display: flex; gap: 16px; margin-bottom: 8px; }
+.shop-foot a { color: inherit; text-decoration: none; }
+.shop-foot p { margin: 0; }
+
+/* 버튼 */
+.shop-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border: 1px solid var(--shop-ink); border-radius: 0; font-weight: 700; font-size: 14px; text-decoration: none; cursor: pointer; }
+.shop-btn.solid { background: var(--shop-ink); color: #fff; }
+.shop-btn.line { background: #fff; color: var(--shop-ink); border-color: var(--shop-line-strong); }
+.shop-btn.big { min-height: 52px; font-size: 15px; }
+
+/* 첫 화면 = 상품 상세 */
+.shop-main { padding-bottom: 8px; }
+.shop-crumb { margin: 28px 0 16px; font-size: 12px; color: var(--shop-faint); }
+.shop-alert { display: grid; gap: 10px; margin-bottom: 20px; padding: 14px 16px; background: var(--shop-notice-bg); color: var(--shop-notice-ink); border: 1px solid #f0dfb0; line-height: 1.6; }
+.shop-alert .shop-btn { justify-self: start; }
+.shop-product { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+.shop-gallery-main { display: grid; place-items: center; aspect-ratio: 1 / 0.82; background: var(--shop-sheet); }
+.shop-mock-book { position: relative; width: 48%; aspect-ratio: 243 / 248; background: #fff; border-left: 6px solid #d6d6d6; box-shadow: 0 18px 30px rgb(0 0 0 / 0.16), 0 2px 4px rgb(0 0 0 / 0.08); overflow: hidden; }
+.shop-mock-book img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.shop-mock-book div { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 14px; background: rgb(255 255 255 / 0.92); display: grid; gap: 2px; }
+.shop-mock-book b { font-size: 15px; }
+.shop-mock-book small { font-size: 10px; color: var(--shop-sub); }
+.shop-thumbs { display: flex; gap: 10px; margin: 10px 0 0; padding: 0; list-style: none; }
+.shop-thumbs li { width: 64px; height: 64px; border: 1px solid var(--shop-line); }
+.shop-thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.shop-info { display: grid; gap: 0; }
+.shop-badges { display: flex; gap: 6px; margin: 0 0 10px; }
+.shop-badges span { padding: 3px 8px; border: 1px solid var(--shop-brand); color: var(--shop-brand); font-size: 11px; font-weight: 700; }
+.shop-badges span.solid { background: var(--shop-brand); color: #fff; }
+.shop-info h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.3; }
+.shop-lead { margin: 10px 0 0; color: var(--shop-sub); line-height: 1.6; }
+.shop-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 18px 0 0; padding-bottom: 20px; border-bottom: 1px solid var(--shop-line); color: var(--shop-sub); font-size: 13px; }
+.shop-price b { color: var(--shop-ink); font-size: 24px; letter-spacing: -0.02em; }
+.shop-option { padding-top: 18px; }
+.shop-option-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.shop-option-head b { font-size: 13px; }
+.shop-option-head span { font-size: 11px; color: var(--shop-faint); }
+.shop-chip { display: inline-flex; align-items: center; min-height: 42px; padding: 0 10px; border: 1px solid var(--shop-line-strong); font-weight: 700; font-size: 13px; }
+.shop-chip.is-on { border: 2px solid var(--shop-ink); }
+.shop-tiers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.shop-tiers li { display: grid; justify-items: center; gap: 2px; padding: 8px 4px; border: 1px solid var(--shop-line-strong); font-size: 13px; }
+.shop-tiers span { font-size: 11px; color: var(--shop-faint); }
+.shop-info > .shop-btn { margin-top: 20px; }
+.shop-btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.shop-box { margin-top: 16px; padding: 14px 16px; border: 1px solid var(--shop-line); font-size: 12px; color: var(--shop-sub); line-height: 1.7; }
+.shop-box b { display: block; margin-bottom: 4px; color: var(--shop-ink); font-size: 13px; }
+.shop-box p { margin: 0; }
+.shop-section { margin-top: 56px; }
+.shop-section h2 { margin: 0 0 12px; font-size: 16px; font-weight: 800; letter-spacing: -0.02em; }
+.shop-table { width: 100%; border-collapse: collapse; border-top: 2px solid var(--shop-ink); font-size: 13px; }
+.shop-table th, .shop-table td { padding: 13px 16px; border-bottom: 1px solid var(--shop-line); text-align: left; vertical-align: top; line-height: 1.6; }
+.shop-table th { width: 22%; background: var(--shop-sheet); font-weight: 700; }
+
+/* 선생님 화면(.book-desk 계열)을 같은 모양으로 갈아입힌다. 화면 구조와 동작은 그대로다. */
+body.shop .design-adult > main { background-color: #fff; font-size: 15px; }
+body.shop .book-desk { max-width: 1180px; padding: 28px 32px 0; color: var(--shop-ink); }
+body.shop .book-desk-header { gap: 8px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--shop-line); font-size: 13px; }
+body.shop .book-desk-header > .brand { display: none; }
+body.shop .book-desk-header > :first-child:not(.brand), body.shop .book-desk-header > .brand + * { margin-left: 0; }
+body.shop .book-desk-hero { display: flex; align-items: flex-end; gap: 24px; margin-bottom: 24px; padding: 0 0 14px; background: none; border: 0; border-bottom: 2px solid var(--shop-ink); border-radius: 0; }
+body.shop .book-desk-hero h1 { margin: 4px 0 6px; font-size: 26px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.3; }
+body.shop .book-desk-hero p { margin: 0; color: var(--shop-sub); font-size: 13px; line-height: 1.6; }
+body.shop .book-desk-hero .eyebrow { color: var(--shop-brand); font-size: 12px; font-weight: 700; letter-spacing: 0; }
+body.shop .book-desk-count { min-width: 0; padding: 0; border: 0; background: none; border-radius: 0; display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+body.shop .book-desk-count b { font-size: 22px; color: var(--shop-ink); line-height: 1; }
+body.shop .book-desk-count span { font-size: 12px; color: var(--shop-sub); }
+body.shop .print-book-stack { display: none; }
+body.shop .book-panel { margin-bottom: 0; padding: 24px 0; background: none; border: 0; border-bottom: 1px solid var(--shop-line); border-radius: 0; box-shadow: none; }
+body.shop .book-panel h2 { font-size: 17px; font-weight: 800; margin: 2px 0 8px; letter-spacing: -0.02em; }
+body.shop .book-panel p { line-height: 1.6; margin: 6px 0; }
+body.shop .book-panel .eyebrow { color: var(--shop-faint); font-size: 11px; letter-spacing: 0.04em; }
+body.shop .book-muted { color: var(--shop-sub); font-size: 12px; }
+body.shop .book-notice { background: var(--shop-notice-bg); color: var(--shop-notice-ink); border: 1px solid #f0dfb0; border-radius: 0; }
+body.shop .book-empty { padding: 40px 20px; background: none; border: 1px dashed var(--shop-line-strong); border-radius: 0; color: var(--shop-sub); }
+body.shop .loading-card { padding: 40px 0; text-align: center; color: var(--shop-sub); }
+body.shop .error-box { border-radius: 0; }
+
+/* 버튼·입력칸: 각지고 그림자 없이. 주문·결제 같은 주 버튼은 검정, 나머지는 흰 바탕 선 */
+body.shop .book-desk .button, body.shop .book-desk .small-button { border-radius: 0; box-shadow: none; transform: none; font-weight: 700; }
+body.shop .book-desk .button { min-height: 44px; padding: 0 18px; font-size: 14px; }
+body.shop .book-desk .button.primary { background: var(--shop-ink); color: #fff; border: 1px solid var(--shop-ink); }
+body.shop .book-desk .button.secondary, body.shop .book-desk .small-button { background: #fff; color: var(--shop-ink); border: 1px solid var(--shop-line-strong); }
+body.shop .book-desk .small-button { padding: 0 12px; font-size: 13px; display: inline-flex; align-items: center; text-decoration: none; }
+body.shop .book-desk .button:disabled { background: #9a9a9a; border-color: #9a9a9a; color: #fff; opacity: 1; }
+body.shop .book-desk input:not([type=checkbox]):not([type=file]), body.shop .book-desk select, body.shop .book-desk textarea { border: 1px solid var(--shop-line-strong); border-radius: 0; color: var(--shop-ink); }
+body.shop .book-desk input[type=checkbox] { accent-color: var(--shop-ink); }
+/* 선생님 화면 공통 모양(design-surface.css의 .design-adult)보다 앞서도록 한 단계 더 좁힌다. */
+body.shop .book-desk :is(input:not([type=checkbox]):not([type=file]), select, textarea) { border: 1px solid var(--shop-line-strong); border-radius: 0; color: var(--shop-ink); background-color: #fff; font-weight: 400; }
+body.shop .book-desk :is(input, textarea)::placeholder { color: var(--shop-faint); font-weight: 400; }
+body.shop main.book-desk .book-status { padding: 0; background: none; border: 0; color: var(--shop-sub); font-size: 13px; }
+body.shop main.book-desk .book-desk-count { padding: 0; min-width: 0; background: none; border: 0; }
+body.shop main.book-desk .book-desk-count b { color: var(--shop-ink); font-size: 22px; }
+body.shop main.book-desk .book-card-copy h3 { font-weight: 700; color: var(--shop-ink); }
+body.shop main.book-desk :is(.book-muted, .book-check small, .book-desk-hero p, .book-order-history p) { color: var(--shop-sub); font-weight: 400; }
+body.shop main.book-desk .book-card-copy p { color: var(--shop-sub); font-size: 12px; }
+body.shop main.book-desk .book-field, body.shop main.book-desk .book-shipping-grid label { font-size: 13px; font-weight: 700; color: var(--shop-ink); }
+body.shop .book-desk :focus-visible { outline: 2px solid var(--shop-brand); outline-offset: 2px; }
+
+/* 학급·책 카드 */
+body.shop .book-library-grid { gap: 16px; }
+body.shop .book-library-card { border: 1px solid var(--shop-line); border-radius: 0; }
+body.shop .book-card-copy h3 { font-size: 15px; }
+body.shop .book-student-group { border-top-color: var(--shop-line); }
+body.shop .book-draft-list li { border-radius: 0; background: #fff; border-color: var(--shop-line); }
+
+/* 주문 화면: 장바구니처럼 단계 표시와 금액 상자 */
+body.shop .book-order-steps { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 0; margin: -10px 0 16px; font-size: 12px; color: var(--shop-faint); }
+body.shop .book-order-steps li { min-height: 0; padding: 0; background: none; border-radius: 0; color: inherit; font-weight: 500; font-size: 12px; }
+body.shop .book-order-steps li::before { content: "0" counter(order-step) " "; display: inline; width: auto; height: auto; background: none; color: inherit; font-size: inherit; border-radius: 0; }
+body.shop .book-order-steps li + li::after { content: none; }
+body.shop .book-order-steps li:not(:last-child)::after { content: "›"; margin: 0 8px; color: var(--shop-line-strong); }
+body.shop .book-order-steps li:first-child { color: var(--shop-ink); font-weight: 700; }
+body.shop .book-order-layout { gap: 32px; }
+body.shop .book-order-desk .book-order-list { border-top: 1px solid var(--shop-ink); margin-top: 12px; }
+body.shop .book-order-desk .book-order-list > article { padding: 14px 12px; border-top: 0; border-bottom: 1px solid var(--shop-line); }
+body.shop .book-order-desk .book-order-list > article.chosen { background: #fafafa; }
+body.shop .book-order-price { color: var(--shop-ink); }
+body.shop .book-order-summary { top: 16px; padding: 22px 20px; border: 1px solid var(--shop-line-strong); background: var(--shop-sheet); }
+body.shop .book-order-summary dl > div { margin: 10px 0; font-size: 13px; }
+body.shop .book-order-totals .total { border-top: 1px solid var(--shop-ink); align-items: baseline; }
+body.shop .book-order-totals .total dt { font-weight: 700; }
+body.shop .book-order-totals .total dd { color: var(--shop-price); font-size: 22px; }
+body.shop .book-order-history { padding: 14px 0; border-top: 0; border-bottom: 1px solid var(--shop-line); }
+body.shop .book-order-status { border-radius: 0; font-size: 12px; font-weight: 700; padding: 2px 8px; }
+
+/* 견적서·결제 */
+body.shop .book-order-banner { border-radius: 0; font-size: 14px; border: 1px solid #f0dfb0; }
+body.shop .book-order-banner.status-paid, body.shop .book-order-banner.status-producing, body.shop .book-order-banner.status-shipped { border-color: #cfe3cb; }
+body.shop .book-quote-sheet { border-radius: 0; border-color: var(--shop-line-strong); color: var(--shop-ink); }
+body.shop .quote-sum, body.shop .quote-parties section, body.shop .quote-deposit { border-radius: 0; }
+body.shop .quote-sum b { color: var(--shop-price); }
+body.shop .quote-deposit { border: 1px solid var(--shop-ink); background: #fff; }
+body.shop .book-quote-page section[aria-labelledby="card-payment-title"] { margin-bottom: 20px; padding: 22px 20px; border: 2px solid var(--shop-ink); }
+
+@media (max-width: 860px) {
+  .shop-wrap { padding: 0 16px; }
+  .shop-gnb .shop-wrap { gap: 16px; flex-wrap: wrap; padding-block: 10px; min-height: 0; }
+  .shop-gnb nav { order: 3; width: 100%; gap: 18px; overflow-x: auto; padding-bottom: 2px; }
+  .shop-gnb nav a { font-size: 14px; white-space: nowrap; }
+  .shop-product { grid-template-columns: 1fr; gap: 24px; }
+  .shop-tiers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shop-table th { width: 30%; }
+  body.shop .book-desk { padding: 20px 16px 0; }
+  body.shop .book-order-steps { justify-content: flex-start; margin-top: 0; }
+}
+@media (max-width: 600px) {
+  body.shop .book-desk-hero { flex-direction: column; align-items: flex-start; gap: 6px; }
+  body.shop .book-desk-hero h1 { font-size: 22px; }
+  body.shop .book-panel { padding: 20px 0; }
+  body.shop .book-order-summary { padding: 18px 16px; }
+  .shop-table th, .shop-table td { padding: 11px 10px; }
+}
+@media print {
+  .shop-header, .shop-foot { display: none !important; }
+}
+body.shop main.book-desk .error-box { background: #fff3f1; color: #b3261e; border: 1px solid #f3c2bb; border-radius: 0; }

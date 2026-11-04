@@ -2417,9 +2417,3 @@ body {
 .paid-lock-screen p{margin:0;font-size:16px;line-height:1.6}
 .paid-lock-screen .paid-lock-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:8px}
 .paid-lock-screen .paid-lock-actions .button{min-height:48px}
-
-/* 그림책 공방 첫 화면(2026-11-04): 수업 코드 칸 자리에 만드는 순서와 시작 버튼. */
-.gallery-landing .studio-steps { display:grid; gap:10px; margin:12px 0 16px; padding:0; list-style:none; text-align:left; }
-.gallery-landing .studio-steps li { display:block; }
-.gallery-landing .studio-steps b { display:block; font-size:15px; }
-.gallery-landing .studio-steps span { display:block; margin-top:2px; color:#5b6b5f; font-size:13px; line-height:1.45; }

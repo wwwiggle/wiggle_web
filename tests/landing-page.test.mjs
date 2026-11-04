@@ -44,8 +44,7 @@ test("teacher link uses the exact copy with a hidden person icon", async () => {
   const page = await read("../app/page.tsx");
   assert.match(page, /<a className="button secondary teacher-link" href="\/teacher">/);
   assert.match(page, /<svg aria-hidden="true"[^>]*>/);
-  // 그림책 공방(2026-11-04)에서는 "선생님 로그인", 수업 앱에서는 "교사 수업 열기".
-  assert.match(page, />\s*\{studio \? "선생님 로그인" : "교사 수업 열기"\}\s*<\/a>/);
+  assert.match(page, />\s*교사 수업 열기\s*<\/a>/);
   assert.doesNotMatch(page, />교사 입장</);
 });
 
