@@ -13,6 +13,7 @@ import { activityLabel, DEFAULT_ACTIVITY_KEY, normalizeActivityKey } from "@/lib
 import { nicknameKeySql } from "@/lib/nickname";
 import { rotateClassroomEntry, updateClassroomAdmission, upsertTeacherView } from "@/lib/teacher-classroom-mutations";
 import { HAND_RAISE_TTL_MS, MARK_NOTE_MAX, validateMarkStrokes } from "@/lib/teacher-marks";
+import { studentAppEnabled } from "@/lib/product-mode";
 
 type ClassroomRow = { id: string; displayName: string; classCode: string; joinToken: string; admissionOpen: number; currentActivity: string; studentCount: number; updatedAt: string };
 
@@ -284,7 +285,9 @@ export async function POST(request: Request) {
     const displayName = cleanText(payload.displayName, 30);
     if (displayName.length < 2) return jsonError("학급 이름을 두 글자 이상 적어 주세요.");
     // 명단은 필수다. 입장은 명단의 번호로만 하므로, 명단 없는 학급은 아무도 못 들어온다.
-    const parsedRoster = parseRoster(payload.roster);
+    // 그림책 공방(학생 앱 끔)에서는 아무도 입장하지 않으므로 빈 명단을 허락한다 — 지은이는 책을 올릴 때 더한다.
+    const emptyStudioRoster = !studentAppEnabled() && (!Array.isArray(payload.roster) || !payload.roster.length);
+    const parsedRoster = emptyStudioRoster ? { entries: [] } : parseRoster(payload.roster);
     if ("error" in parsedRoster) return jsonError(parsedRoster.error);
     const roster = parsedRoster.entries;
     // 학교·학년은 선생님(성인)이 학급을 만들 때 한 번만 받는다(선택 항목). 학생은 입력하지 않고,
