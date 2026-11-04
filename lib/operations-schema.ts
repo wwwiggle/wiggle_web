@@ -12,4 +12,6 @@ export const operationsSchema = [
   `CREATE TABLE IF NOT EXISTS book_orders (id TEXT PRIMARY KEY, order_number TEXT NOT NULL UNIQUE, teacher_id TEXT NOT NULL REFERENCES teachers(id), classroom_id TEXT NOT NULL, document_json TEXT NOT NULL, quote_json TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'awaiting_deposit', admin_note TEXT NOT NULL DEFAULT '', paid_at TEXT, shipped_at TEXT, canceled_at TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
   `CREATE INDEX IF NOT EXISTS book_orders_teacher_idx ON book_orders(teacher_id, classroom_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS book_orders_status_idx ON book_orders(status, created_at)`,
+  // 카드 결제(2026-11-04 그림책 공방, 토스페이먼츠). 승인된 결제 한 건이 주문 한 건을 입금 확인으로 옮긴다.
+  `CREATE TABLE IF NOT EXISTS book_order_payments (order_id TEXT PRIMARY KEY REFERENCES book_orders(id), payment_key TEXT NOT NULL UNIQUE, method TEXT NOT NULL DEFAULT '', amount INTEGER NOT NULL, approved_at TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
 ];

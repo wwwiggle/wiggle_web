@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Logo } from "./Logo";
 import { teacherRequest } from "./book-workflow-client";
+import { BookOrderCardPayment } from "./BookOrderCardPayment";
 import { BOOK_ORDER_STATUS_LABELS, orderDate, won } from "@/lib/book-order-pricing";
 import type { BookOrderView } from "@/lib/book-orders";
 import "./book-workflow.css";
@@ -35,6 +36,7 @@ export function BookOrderQuote({ orderId }: { orderId: string }) {
         : canceled ? "취소된 주문이에요. 이 견적서로 입금하지 마세요."
           : <>지금 상태: <b>{BOOK_ORDER_STATUS_LABELS[order.status]}</b>{order.admin_note && ` · ${order.admin_note}`}</>}
     </p>
+    {owner && order.status === "awaiting_deposit" && <BookOrderCardPayment orderId={order.id} />}
     <article className={`book-quote-sheet ${canceled ? "canceled" : ""}`} aria-label="견적서">
       <h1>견 적 서</h1>
       <div className="quote-meta"><p>주문번호 <b>{order.order_number}</b></p><p>발행일 {orderDate(quote.issuedAt)}</p><p>입금 기한 {orderDate(quote.depositDueAt)}</p></div>

@@ -2,6 +2,7 @@ import { bindings } from "@/db/runtime";
 import { requireTeacher, sameOrigin, noStoreJson, jsonError, rateLimit, cleanText, id } from "@/lib/security";
 import { emptyStorybookDocument, DEFAULT_STORYBOOK_FORMAT, STORYBOOK_FORMATS, type StorybookFormat } from "@/lib/storybook-model";
 import { bookClassroom } from "@/lib/book-workflow";
+import { studioAuthor } from "@/lib/studio-authors";
 export async function GET(request: Request) {
   const teacher = await requireTeacher();
   if (!teacher) return jsonError("교사 로그인이 필요해요.", 401);
@@ -18,9 +19,15 @@ export async function POST(request: Request) {
   if (!await rateLimit(`book-import:${teacher.id}`, 50, 60)) return jsonError("잠시 후 다시 올려 주세요.", 429);
   const raw = await request.json().catch(() => ({}));
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return jsonError("입력 값을 확인해 주세요.");
-  const data = raw as { classroomId?: string; studentId?: string; title?: string; bookId?: string; format: StorybookFormat; pageCount: number };
-  if (typeof data.classroomId !== "string" || typeof data.studentId !== "string") return jsonError("학급과 학생을 선택해 주세요.");
+  const data = raw as { classroomId?: string; studentId?: string; authorName?: string; title?: string; bookId?: string; format: StorybookFormat; pageCount: number };
+  if (typeof data.classroomId !== "string" || (typeof data.studentId !== "string" && typeof data.authorName !== "string")) return jsonError("학급과 학생을 선택해 주세요.");
   if (!await bookClassroom(teacher.id, data.classroomId ?? "")) return jsonError("학급 권한이 없어요.", 403);
+  // 그림책 공방: 명단에서 고르지 않고 지은이 이름을 적으면 명단 자리를 찾거나 만든다(lib/studio-authors.ts).
+  if (typeof data.studentId !== "string") {
+    const author = await studioAuthor(data.classroomId, data.authorName);
+    if ("error" in author) return jsonError(author.error ?? "지은이 이름을 적어 주세요.");
+    data.studentId = author.id;
+  }
   const student = await bindings().DB.prepare(`SELECT id FROM student_profiles WHERE id=? AND classroom_id=? AND archived_at IS NULL AND seat_number IS NOT NULL`).bind(data.studentId ?? "", data.classroomId).first<{ id: string }>();
   if (!student) return jsonError("이 그림책의 학생을 학급 명단에서 선택해 주세요.", 400);
   if (!STORYBOOK_FORMATS.includes(data.format) || !Number.isSafeInteger(data.pageCount) || data.pageCount < 1) return jsonError("PDF의 형식과 쪽 수를 확인해 주세요.");

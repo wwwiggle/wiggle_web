@@ -81,6 +81,8 @@ export async function startTestServer({ env: extraEnv } = {}) {
         R2_S3_BUCKET: "",
         R2_S3_ACCESS_KEY_ID: "",
         R2_S3_SECRET_ACCESS_KEY: "",
+        // 학생 앱 시험이 대부분이라 기본은 켠다. 그림책 공방(학생 앱 끔)은 tests/book-studio-mode.test.mjs가 끄고 본다.
+        WIGGLE_STUDENT_APP: "1",
         ...extraEnv,
       },
       stdio: ["ignore", "pipe", "pipe"],
