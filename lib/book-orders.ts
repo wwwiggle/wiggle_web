@@ -175,3 +175,49 @@ export async function saveBookOrderNote(id: string, note: unknown) {
   const result = await bindings().DB.prepare(`UPDATE book_orders SET admin_note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(cleanText(note, 300), id).run();
   if (!result.meta.changes) throw new Error("주문을 찾을 수 없어요.");
 }
+
+/** 토스 결제창에 넘길 주문 이름. 첫 책 제목과 나머지 권수. */
+export function bookOrderName(order: BookOrderView) {
+  const [first, ...rest] = order.document.items;
+  const title = first?.title ?? "그림책";
+  return (rest.length ? `${title} 외 ${rest.length}종` : title).slice(0, 100);
+}
+
+/**
+ * 카드 결제 승인(2026-11-04 그림책 공방). 토스 결제창에서 인증을 마친 결제를 승인하고, 주문을 입금 확인(paid)으로 옮긴다.
+ * - 금액은 견적서 합계와 같아야 한다(결제창 주소의 금액은 손님이 바꿀 수 있다).
+ * - 같은 결제를 두 번 보내면(새로고침) 한 번만 처리한다.
+ * - 승인 뒤 주문을 옮기지 못하면(그사이 취소 등) 결제를 바로 취소해 돈만 빠져나가는 일이 없게 한다.
+ */
+export async function payBookOrderByCard(teacherId: string, id: string, body: Record<string, unknown>) {
+  const { confirmPayment, cancelPayment, TossError } = await import("@/lib/toss");
+  const db = bindings().DB, order = await bookOrder(id);
+  if (!order || order.teacher_id !== teacherId) throw new Error("주문을 찾을 수 없어요.");
+  const paymentKey = String(body.paymentKey ?? ""), amount = Number(body.amount);
+  if (!/^[A-Za-z0-9_-]{1,200}$/.test(paymentKey) || String(body.orderId ?? "") !== id) throw new Error("결제 정보가 올바르지 않아요.");
+  const prior = await db.prepare(`SELECT payment_key AS paymentKey FROM book_order_payments WHERE order_id = ?`).bind(id).first<{ paymentKey: string }>();
+  if (prior) { if (prior.paymentKey === paymentKey) return { paid: true }; throw new Error("이미 결제한 주문이에요."); }
+  if (order.status !== "awaiting_deposit") throw new Error("결제할 수 있는 주문이 아니에요. 주문 상태를 확인해 주세요.");
+  if (!Number.isSafeInteger(amount) || amount !== order.quote.totals.total) throw new Error("결제 금액이 견적서와 달라요. 다시 결제해 주세요.");
+  let payment;
+  try { payment = await confirmPayment(paymentKey, id, amount); }
+  catch (error) { throw new Error(error instanceof TossError ? `결제가 승인되지 않았어요: ${error.message}` : "결제를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
+  if (payment.status !== "DONE" || payment.totalAmount !== amount || payment.orderId !== id) {
+    await cancelPayment(paymentKey, "결제 확인 값 불일치").catch(() => {});
+    throw new Error("결제 확인 값이 맞지 않아 결제를 취소했어요.");
+  }
+  try {
+    const results = await db.batch([
+      db.prepare(`UPDATE book_orders SET status = 'paid', paid_at = CURRENT_TIMESTAMP, admin_note = CASE WHEN admin_note = '' THEN ? ELSE admin_note END, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'awaiting_deposit'`).bind(`카드 결제 ${payment.method ?? ""}`.trim(), id),
+      db.prepare(`INSERT INTO book_order_payments(order_id, payment_key, method, amount, approved_at) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM book_orders WHERE id = ? AND status = 'paid')`).bind(id, paymentKey, payment.method ?? "", amount, payment.approvedAt ?? null, id),
+    ]);
+    if (!results[0]?.meta.changes || !results[1]?.meta.changes) throw new Error("order not payable");
+  } catch {
+    // 같은 결제를 두 번 눌러 다른 요청이 먼저 처리했으면 그 결과를 그대로 쓴다(취소하면 안 된다).
+    const done = await db.prepare(`SELECT 1 AS ok FROM book_order_payments WHERE order_id = ? AND payment_key = ?`).bind(id, paymentKey).first();
+    if (done) return { paid: true };
+    await cancelPayment(paymentKey, "주문 상태 변경 실패").catch(() => {});
+    throw new Error("주문 상태가 바뀌어 결제를 취소했어요. 화면을 새로고침해 주세요.");
+  }
+  return { paid: true };
+}
