@@ -38,7 +38,7 @@ export function TeacherStudioHome() {
   }
   if (signedOut) return <main className="book-desk"><header className="book-desk-header"><Logo /></header><section className="book-panel"><h1>로그인이 필요해요</h1><p>선생님 구글 계정으로 들어와 주세요.</p><a className="button primary" href="/api/auth/google/start?return_to=%2Fteacher">구글로 로그인</a></section></main>;
   return <main className="book-desk">
-    <header className="book-desk-header"><Logo /><span className="book-status">{teacher ? `${teacher} 선생님` : "선생님"}</span><button type="button" className="small-button" onClick={() => void logout()}>로그아웃</button></header>
+    <header className="book-desk-header"><Logo /><span className="book-status">{!teacher ? "선생님" : teacher.endsWith("선생님") ? teacher : `${teacher} 선생님`}</span><button type="button" className="small-button" onClick={() => void logout()}>로그아웃</button></header>
     <section className="book-desk-hero"><div><p className="eyebrow">꿈틀 그림책 공방</p><h1>우리 반 그림책 만들기</h1><p>학급(책 묶음)을 만들고, 그 안에서 아이들 그림 사진·스캔이나 완성 PDF로 그림책을 만들어 주문해요.</p></div><div className="book-desk-count"><b>{classrooms?.length ?? "–"}</b><span>학급</span></div></section>
     {error && <p className="error-box" role="alert">{error}</p>}
     <section className="book-panel" aria-labelledby="studio-classrooms"><h2 id="studio-classrooms">내 학급</h2>

@@ -1,5 +1,5 @@
 "use client";
-// 카드 결제(2026-11-04 그림책 공방). 견적서 화면에서 토스페이먼츠 결제창을 열고, 결제창은 /teacher/book-orders/[id]/pay로 돌아온다.
+// 온라인 결제(2026-11-04 그림책 공방, 카드·계좌이체·간편결제). 견적서 화면에서 토스페이먼츠 결제창을 열고, 결제창은 /teacher/book-orders/[id]/pay로 돌아온다.
 // 계좌 입금(견적서)과 함께 둔다 — 학교는 계좌이체·세금계산서가 필요한 경우가 많다.
 import { useEffect, useRef, useState } from "react";
 import { teacherRequest } from "./book-workflow-client";
@@ -52,9 +52,9 @@ export function BookOrderCardPayment({ orderId }: { orderId: string }) {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "결제를 시작하지 못했어요."); setBusy(false); }
   }
   return <section className="book-panel quote-screen-only" aria-labelledby="card-payment-title">
-    <h2 id="card-payment-title">카드로 바로 결제</h2>
-    <p>계좌 입금 대신 카드(학교 구매카드 포함)로 {won(setup.amount ?? 0)}을 결제할 수 있어요. 결제하면 바로 제작을 시작해요.</p>
-    {!open ? <button type="button" className="button primary" onClick={() => setOpen(true)}>카드 결제 열기</button> : <>
+    <h2 id="card-payment-title">온라인으로 바로 결제</h2>
+    <p>계좌 입금 대신 카드(학교 구매카드 포함)·계좌이체·간편결제로 {won(setup.amount ?? 0)}을 결제할 수 있어요. 결제하면 바로 제작을 시작해요.</p>
+    {!open ? <button type="button" className="button primary" onClick={() => setOpen(true)}>결제 방법 고르기</button> : <>
       <div id="book-order-payment-method" /><div id="book-order-payment-agreement" />
       <button type="button" className="button primary full" disabled={busy} onClick={() => void pay()}>{busy ? "결제창 여는 중…" : `${won(setup.amount ?? 0)} 결제하기`}</button>
     </>}

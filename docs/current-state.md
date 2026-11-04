@@ -1,5 +1,25 @@
 # Wiggle Web 현재 상태
 
+## 2026-11-04 그림책 공방: 학생 화면 끄기·사진/PDF로 책 만들기·온라인 결제 (`claude/book-order`, main 미반영)
+
+사용자 지시(2026-11-04): "기본 기능에서 그리기 기능은 빼고, 올라온 그림 수정해서 pdf로 넣거나 완성된 pdf를 넣어서 주문·결제 할 수 있게". 학생 화면은 필요 없고 교사 구글 로그인은 그대로. 작업은 브랜치에서 하고 고정 시험 주소(`test.kkumtle.app`, Vercel 설정은 용환님)에서 본 뒤 main에 합친다.
+
+- **스위치** `lib/product-mode.ts`: `WIGGLE_STUDENT_APP=1`일 때만 예전 수업 앱. 기본은 그림책 공방. 학생 코드·데이터는 지우지 않았다.
+  - `proxy.ts`: `/join`·`/student`·`/family` 화면 → `/`. API는 그대로(기존 기기 저장·시험).
+  - 첫 화면: 수업 코드 칸 대신 "그림책 만들기" 3단계와 시작 버튼. 교사 링크 문구 "선생님 로그인".
+  - `/teacher`: `TeacherStudioHome`(학급 목록·명단 없이 만들기). `/teacher/class/[id]` → `/books`.
+  - 그림책 책상: 실시간 보기·피드백 감춤, 「그림 사진으로 새 그림책」(`TeacherPhotoImport`) 추가.
+- **지은이**: PDF·사진 가져오기에서 이름을 적으면 `lib/studio-authors.ts`가 학급 명단 자리를 찾거나 만든다(같은 이름 재사용, 참여 코드 NULL). 책은 지금처럼 학생 한 명에 묶인다 — 편집·ebook·주문 코드를 그대로 쓴다.
+- **PDF 한도 30MB → 300MB**(`lib/import-book-pdf.ts`, 브라우저에서 쪽마다 그림으로 올리므로 서버 요청 크기와 무관). 실제 학교 책 96MB·32쪽을 로컬에서 가져와 편집기까지 확인.
+- **온라인 결제**(토스 결제위젯 v2): 견적서(입금 대기, 주문한 교사)에 「온라인으로 바로 결제」. `/teacher/book-orders/[id]/pay`에서 서버 승인 → 주문 `paid`, 표 `book_order_payments`(SQLite·Postgres 모두 추가). 금액=견적 합계·주문 id 일치 확인, 같은 결제 재전송은 한 번만, 승인 값 불일치·주문 이동 실패 시 결제 취소. `TOSS_CLIENT_KEY`·`TOSS_SECRET_KEY` 없으면 결제 칸을 숨긴다.
+  - 로컬에서 토스 **시험 키**로 끝까지 결제(퀵계좌이체 시험) → 주문 「입금 확인」까지 확인.
+- 확인: typecheck, lint(새 경고 없음), `npm test` 474개 중 472 통과·0 실패(2개 건너뜀은 원래대로), 새 시험 `book-studio-mode`·`book-order-card-payment`는 SQLite·Postgres 모두 통과. 320·390 폭에서 가로 넘침 0.
+- **남은 일**
+  - 결제 뒤 스위트북 **자동 발주**: 지금은 운영자가 「제작 요청」을 손으로 한다(이전과 같음).
+  - Vercel: `test.kkumtle.app`을 이 브랜치에 연결, 미리보기 환경에 토스 시험 키, 구글 콘솔 리디렉션 URI(용환님).
+  - main에 합치면 www가 바로 그림책 공방이 된다. 지금 쓰는 학교가 있으면 합치기 전에 알리거나, Vercel에 `WIGGLE_STUDENT_APP=1`을 두고 합친 뒤 끄는 시점을 정한다.
+  - 주문 화면의 학교·학년·반 필수 입력, 견적서 공급자 정보(사업자 정보)는 그대로다.
+
 ## 2026-11-02 그림 잠금 확대·면지 없앰·내지 24쪽·ebook 서재·속도 (`claude/paid-lock-ebook-shelf`)
 
 결정과 이유는 `product-decisions.md` 「2026-11-02 그림 유료 잠금 확대…」에 있다.

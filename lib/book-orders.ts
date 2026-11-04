@@ -184,7 +184,7 @@ export function bookOrderName(order: BookOrderView) {
 }
 
 /**
- * 카드 결제 승인(2026-11-04 그림책 공방). 토스 결제창에서 인증을 마친 결제를 승인하고, 주문을 입금 확인(paid)으로 옮긴다.
+ * 온라인 결제 승인(2026-11-04 그림책 공방 — 카드·계좌이체·간편결제, 토스 결제위젯). 토스 결제창에서 인증을 마친 결제를 승인하고, 주문을 입금 확인(paid)으로 옮긴다.
  * - 금액은 견적서 합계와 같아야 한다(결제창 주소의 금액은 손님이 바꿀 수 있다).
  * - 같은 결제를 두 번 보내면(새로고침) 한 번만 처리한다.
  * - 승인 뒤 주문을 옮기지 못하면(그사이 취소 등) 결제를 바로 취소해 돈만 빠져나가는 일이 없게 한다.
@@ -208,7 +208,7 @@ export async function payBookOrderByCard(teacherId: string, id: string, body: Re
   }
   try {
     const results = await db.batch([
-      db.prepare(`UPDATE book_orders SET status = 'paid', paid_at = CURRENT_TIMESTAMP, admin_note = CASE WHEN admin_note = '' THEN ? ELSE admin_note END, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'awaiting_deposit'`).bind(`카드 결제 ${payment.method ?? ""}`.trim(), id),
+      db.prepare(`UPDATE book_orders SET status = 'paid', paid_at = CURRENT_TIMESTAMP, admin_note = CASE WHEN admin_note = '' THEN ? ELSE admin_note END, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'awaiting_deposit'`).bind(`온라인 결제(${payment.method || "토스"})`, id),
       db.prepare(`INSERT INTO book_order_payments(order_id, payment_key, method, amount, approved_at) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM book_orders WHERE id = ? AND status = 'paid')`).bind(id, paymentKey, payment.method ?? "", amount, payment.approvedAt ?? null, id),
     ]);
     if (!results[0]?.meta.changes || !results[1]?.meta.changes) throw new Error("order not payable");
