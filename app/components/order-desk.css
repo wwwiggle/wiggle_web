@@ -1,0 +1,226 @@
+/* 그림책 주문서(2026-11-06). 종이 주문서처럼: 미색 바탕, 잉크색 글자, 가는 선, 초록은 고른 것에만.
+ * 교사 화면 공통 틀(design-surface .design-adult)과 섞이지 않게 .od 아래에서만 쓴다. */
+main.od{--paper:#f6f3ec;--sheet:#fffdf8;--ink:#1f1d1a;--sub:#6b655a;--rule:#d9d2c4;--pick:#2e5f23;--pick-pale:#e9efe0;--warn:#a3401f;
+  max-width:1160px;margin:0 auto;padding:20px 32px 72px;background:var(--paper);color:var(--ink);font-size:16px;line-height:1.6;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.design-adult>main.od{background:var(--paper)}
+body:has(main.od){background:#f6f3ec}
+main.od h1,main.od h2{color:var(--ink);letter-spacing:-.02em;font-weight:700}
+main.od h1{font-weight:800}
+/* 앱 공통 label(굵게, 위아래 여백)을 주문서 안에서는 끈다 */
+main.od label{margin:0;font-weight:400}
+main.od :is(input,select,textarea){font-weight:400}
+main.od a{color:inherit}
+main.od :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+.od-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--rule)}
+.od-top nav{display:flex;gap:18px;font-size:15px}
+.od-top nav a{text-decoration:none;padding:10px 0}
+.od-top nav a:hover{text-decoration:underline}
+
+.od-title{display:flex;align-items:end;justify-content:space-between;gap:12px 32px;flex-wrap:wrap;padding:28px 0 18px;border-bottom:2px solid var(--ink)}
+.od-title p{margin:0;color:var(--sub);font-size:15px}
+.od-title h1{margin:2px 0 0;font-size:34px;line-height:1.2;font-weight:800}
+.od-title .od-title-note{max-width:360px;font-size:14px}
+
+.od-error,.od-note,.od-loading{margin:16px 0 0;padding:12px 14px;font-size:15px}
+.od-error{border-left:3px solid var(--warn);background:#fbefe9;color:var(--warn)}
+.od-note{border-left:3px solid #b8892b;background:#fbf4e2;color:#5a4410}
+.od-loading{color:var(--sub)}
+
+.od-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:40px;align-items:start;margin-top:8px}
+main.od fieldset.od-form{margin:0;padding:0;border:0;min-width:0}
+
+/* 상품 안내 */
+.od-product{display:grid;grid-template-columns:220px minmax(0,1fr);gap:24px;padding:24px 0;border-bottom:1px solid var(--rule)}
+.od-samples{display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;gap:6px;aspect-ratio:3/2}
+.od-samples img{width:100%;height:100%;object-fit:cover;display:block;background:#e8e2d5}
+.od-samples img:first-child{grid-row:1/3}
+.od-product h2{margin:0 0 10px;font-size:20px}
+.od-spec{margin:0;display:grid;gap:4px;font-size:14px}
+.od-spec div{display:grid;grid-template-columns:56px minmax(0,1fr);gap:10px}
+.od-spec dt{color:var(--sub)}
+.od-spec dd{margin:0}
+
+/* 단계 */
+.od-step{padding:28px 0;border-bottom:1px solid var(--rule)}
+.od-step h2{display:flex;align-items:center;gap:12px;margin:0 0 16px;font-size:20px}
+.od-step h2 span{display:inline-grid;place-items:center;width:30px;height:30px;border:1.5px solid var(--ink);font-size:15px;font-weight:800}
+.od-step h2 small{font-size:13px;font-weight:400;color:var(--sub)}
+
+.od-bulk{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-bottom:14px;font-size:15px}
+
+.od-table-scroll{position:relative;overflow-x:auto}
+.od-books,.od-orders{width:100%;border-collapse:collapse;font-size:15px}
+.od-books thead th,.od-orders thead th{padding:8px 10px;border-bottom:1px solid var(--ink);color:var(--sub);font-size:13px;font-weight:600;text-align:right;white-space:nowrap}
+.od-books thead th:first-child,.od-orders thead th:nth-child(-n+3){text-align:left}
+.od-books td,.od-books tbody th{padding:10px;border-bottom:1px solid var(--rule);text-align:right;vertical-align:middle;white-space:nowrap}
+.od-books tbody th{text-align:left;font-weight:400;white-space:normal;width:100%}
+.od-books tbody th label{display:flex;align-items:center;gap:12px;min-height:44px;cursor:pointer}
+.od-books tbody th span{display:grid}
+.od-books tbody th small,.od-books td small{color:var(--sub);font-size:13px}
+.od-books tr.on{background:var(--pick-pale)}
+.od-books tr.on th{box-shadow:inset 3px 0 0 var(--pick)}
+.od-books tr.off{color:var(--sub)}
+.od-books td:last-child{min-width:84px;font-weight:700}
+main.od input[type=checkbox]{width:20px;height:20px;flex:none;margin:0;accent-color:var(--pick)}
+
+.od-stepper{display:inline-flex;border:1px solid var(--ink);background:var(--sheet)}
+main.od .od-stepper button{width:40px;min-height:40px;border:0;background:transparent;color:var(--ink);font-size:18px;line-height:1;cursor:pointer}
+main.od .od-stepper button:disabled{color:#bdb5a6;cursor:default}
+main.od .od-stepper input{width:48px;min-height:40px;padding:0;border:0;border-inline:1px solid var(--rule);border-radius:0;background:transparent;text-align:center;font-size:16px;font-weight:700;-moz-appearance:textfield;appearance:textfield}
+.od-stepper input::-webkit-inner-spin-button,.od-stepper input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+
+/* 받는 곳 */
+.od-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 16px}
+.od-fields label{display:grid;gap:4px;font-size:14px;color:var(--sub)}
+.od-fields .w2{grid-column:span 2}
+.od-fields .w3{grid-column:span 3}
+main.od .od-fields :is(input,select),main.od textarea{width:100%;min-height:44px;padding:9px 11px;border:1px solid #bfb7a6;border-radius:2px;background:var(--sheet);color:var(--ink);font:inherit;font-size:16px}
+main.od textarea{resize:vertical;min-height:84px}
+main.od .od-fields :is(input,select):focus,main.od textarea:focus{border-color:var(--ink);outline:none;box-shadow:0 0 0 1px var(--ink)}
+main.od ::placeholder{color:#a69e8e}
+.od-reuse{margin-bottom:14px}
+
+.od-pay{margin:0;padding:0;list-style:none;display:grid;gap:10px;font-size:15px}
+.od-pay li{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px}
+.od-pay b{font-weight:700}
+
+/* 버튼 */
+main.od .od-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 16px;border:1px solid var(--ink);border-radius:2px;background:var(--sheet);color:var(--ink);font:inherit;font-size:15px;font-weight:600;cursor:pointer}
+main.od .od-btn:hover:not(:disabled){background:#efeadf}
+main.od .od-btn.od-primary{background:var(--ink);color:var(--sheet)}
+main.od .od-btn.od-primary:hover:not(:disabled){background:#000}
+main.od .od-btn:disabled{border-color:#c9c1b1;background:#ece7dc;color:#9a9284;cursor:not-allowed}
+main.od .od-link{min-height:44px;padding:0 4px;border:0;background:none;color:var(--ink);font:inherit;font-size:14px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+main.od .od-link:disabled{color:#9a9284}
+
+/* 견적(오른쪽) */
+.od-receipt{position:sticky;top:16px;display:grid;gap:10px;margin-top:24px;padding:20px 20px 16px;background:var(--sheet);border:1px solid var(--rule);border-top:3px solid var(--ink)}
+.od-receipt h2{margin:0;font-size:18px}
+.od-receipt-room{margin:-6px 0 4px;color:var(--sub);font-size:14px}
+.od-receipt-empty{margin:0;padding:18px 0;border-block:1px dashed var(--rule);color:var(--sub);font-size:14px;text-align:center}
+.od-lines{margin:0;padding:8px 0;list-style:none;display:grid;gap:4px;max-height:220px;overflow:auto;border-block:1px dashed var(--rule);font-size:14px}
+.od-lines li{display:flex;justify-content:space-between;gap:12px}
+.od-lines small{color:var(--sub)}
+.od-lines li>span:last-child{white-space:nowrap}
+.od-sum{margin:0;display:grid;gap:2px;font-size:15px}
+.od-sum div{display:flex;justify-content:space-between;gap:12px}
+.od-sum dt{color:var(--sub)}
+.od-sum dd{margin:0}
+.od-sum .od-total{margin-top:8px;padding-top:10px;border-top:1px solid var(--ink);align-items:baseline}
+.od-sum .od-total dt{color:var(--ink);font-weight:700}
+.od-sum .od-total dd{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.od-hint{margin:0;font-size:13px;color:var(--sub)}
+.od-confirm{display:flex;gap:10px;align-items:center;min-height:44px;margin-top:4px;font-size:14px;cursor:pointer}
+.od-receipt .od-btn{width:100%}
+.od-reset{margin:0;justify-self:center;font-size:14px}
+.od-ask{margin:6px 0 0;padding-top:10px;border-top:1px solid var(--rule);color:var(--sub);font-size:13px}
+
+/* 휴대폰 아래 막대 */
+.od-bar{display:none}
+
+/* 주문한 내역 */
+.od-history{margin-top:48px}
+.od-history-head{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:2px solid var(--ink)}
+.od-history h2{margin:0;padding:6px 0;font-size:20px}
+.od-orders td{padding:10px;border-bottom:1px solid var(--rule);text-align:right;white-space:nowrap;vertical-align:middle}
+.od-orders td:nth-child(-n+3){text-align:left}
+.od-orders td:nth-child(3){white-space:normal;min-width:180px}
+.od-orders td:nth-child(3) small{display:block;color:var(--sub);font-size:13px}
+.od-orders td:last-child a{display:inline-block;padding:10px 4px}
+.od-state{font-size:14px;font-weight:700}
+.od-state.s-awaiting_deposit{color:#8a5a00}
+.od-state.s-paid,.od-state.s-producing{color:#1f4f86}
+.od-state.s-shipped{color:var(--pick)}
+.od-state.s-canceled{color:var(--sub);text-decoration:line-through}
+.od-empty{padding:28px 0;color:var(--sub);text-align:center}
+.od-legacy{margin:20px 0 0;color:var(--sub);font-size:14px}
+.od-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* 주문 전 견적서 */
+.od-preview{margin:auto;width:min(860px,calc(100vw - 24px));max-height:calc(100vh - 24px);padding:0;border:0;background:#fff;color:#1f1d1a}
+.od-preview::backdrop{background:rgba(31,29,26,.55)}
+.od-preview-tools{position:sticky;top:0;display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;background:#f6f3ec;border-bottom:1px solid #d9d2c4}
+.od-preview .od-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 16px;border:1px solid #1f1d1a;border-radius:2px;background:#fff;color:#1f1d1a;font:inherit;font-size:15px;font-weight:600;cursor:pointer}
+.od-preview .od-btn.od-primary{background:#1f1d1a;color:#fff}
+.od-sheet{padding:36px 40px;font-size:14px;line-height:1.6}
+.od-sheet h1{margin:0 0 16px;text-align:center;font-size:30px;letter-spacing:.4em}
+.od-sheet h2{margin:0 0 6px;font-size:15px}
+.od-sheet p{margin:0}
+.od-sheet-meta{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 16px;padding-bottom:10px;border-bottom:2px solid #1f1d1a}
+.od-sheet-parties{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}
+.od-sheet-parties section{padding:12px 14px;border:1px solid #cfc8ba}
+.od-sheet-parties dl{margin:0;display:grid;gap:2px}
+.od-sheet-parties dl div{display:grid;grid-template-columns:84px minmax(0,1fr);gap:8px}
+.od-sheet-parties dt{color:#6b655a}
+.od-sheet-parties dd{margin:0}
+.od-sheet-sum{margin:0 0 10px!important;padding:10px 14px;background:#f3efe6;font-size:16px}
+.od-sheet-sum b{font-size:20px}
+.od-sheet-table{width:100%;min-width:560px;border-collapse:collapse;font-size:13px}
+.od-sheet-table :is(th,td){padding:7px 9px;border:1px solid #cfc8ba;text-align:left}
+.od-sheet-table thead th{background:#f3efe6;text-align:center}
+.od-sheet-table td:nth-child(1),.od-sheet-table td:nth-child(4){text-align:center;white-space:nowrap}
+.od-sheet-table td:nth-child(5),.od-sheet-table td:nth-child(6),.od-sheet-table tfoot td{text-align:right;white-space:nowrap}
+.od-sheet-table tfoot th{text-align:right;font-weight:500}
+.od-sheet-total :is(th,td){font-size:15px;font-weight:800!important;background:#f3efe6}
+.od-sheet-ship{margin-top:12px!important}
+.od-sheet-note{margin-top:14px!important;padding:8px 12px;border-left:3px solid #b5ad9d;white-space:pre-wrap}
+
+@media(max-width:900px){
+  main.od{padding:16px 16px 96px}
+  .od-grid{grid-template-columns:minmax(0,1fr);gap:0}
+  .od-receipt{position:static;margin-top:28px}
+  .od-bar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:#1f1d1a;color:#fffdf8;font-size:15px}
+  .od-bar b{font-size:18px}
+  main.od .od-bar button{min-height:44px;padding:0 14px;border:1px solid #fffdf8;border-radius:2px;background:transparent;color:#fffdf8;font:inherit;font-weight:700;cursor:pointer}
+}
+@media(max-width:640px){
+  .od-title h1{font-size:28px}
+  .od-product{grid-template-columns:1fr;gap:16px}
+  .od-samples{max-width:320px}
+  .od-fields{grid-template-columns:1fr 1fr}
+  .od-fields .w2,.od-fields .w3{grid-column:1/-1}
+  .od-pay li{grid-template-columns:1fr;gap:0}
+  /* 책 표: 한 줄에 책, 다음 줄에 쪽·단가·권수·금액 */
+  .od-books thead{display:none}
+  .od-books,.od-books tbody{display:block}
+  .od-books tr{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:0 12px;padding:4px 10px 10px;border-bottom:1px solid var(--rule)}
+  .od-books tr.on{box-shadow:inset 3px 0 0 var(--pick)}
+  .od-books tr.on th{box-shadow:none}
+  .od-books tbody th{grid-column:1/-1;padding:6px 0;border:0}
+  .od-books td{padding:0;border:0;font-size:14px;color:var(--sub)}
+  .od-books td:nth-child(2):not(:has(small))::after{content:"쪽"}
+  .od-books td:nth-child(2){grid-row:2;grid-column:1}
+  .od-books td:nth-child(3){grid-row:2;grid-column:2}
+  .od-books td:nth-child(4){justify-self:end;grid-column:4;grid-row:2/4}
+  .od-books td:last-child{grid-row:3;grid-column:1/4;min-width:0;text-align:left;color:var(--ink)}
+  .od-books td:last-child:empty{display:none}
+  /* 주문한 내역: 한 주문을 네 줄로 */
+  .od-orders thead{display:none}
+  .od-orders,.od-orders tbody{display:block}
+  .od-orders tr{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:12px 0;border-bottom:1px solid var(--rule)}
+  .od-orders td{padding:0;border:0;text-align:left!important}
+  .od-orders td:nth-child(1){grid-row:1;grid-column:1;font-weight:700}
+  .od-orders td:nth-child(5){grid-row:1;grid-column:2;text-align:right!important}
+  .od-orders td:nth-child(3){grid-row:2;grid-column:1/-1;min-width:0}
+  .od-orders td:nth-child(2){grid-row:3;grid-column:1;color:var(--sub);font-size:14px}
+  .od-orders td:nth-child(4){grid-row:3;grid-column:2;font-weight:700;text-align:right!important}
+  .od-orders td:last-child{grid-row:4;grid-column:1/-1}
+  .od-orders td:last-child a{padding-left:0}
+  .od-sheet{padding:20px 14px}
+  .od-sheet-parties{grid-template-columns:1fr}
+}
+@media(max-width:360px){
+  .od-fields{grid-template-columns:1fr}
+  .od-bulk{font-size:14px}
+}
+@media print{
+  body.od-printing-preview main.od>:not(dialog){display:none!important}
+  body.od-printing-preview :is(.shop-header,.shop-foot){display:none!important}
+  body.od-printing-preview main.od{padding:0;background:#fff}
+  .od-preview{position:static;width:auto;max-height:none;overflow:visible}
+  .od-preview-tools{display:none}
+  .od-preview::backdrop{background:none}
+  .od-sheet{padding:0}
+  .od-sheet-table{min-width:0}
+}

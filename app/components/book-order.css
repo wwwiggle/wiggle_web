@@ -1,25 +1,9 @@
 /* 그림책 주문 · 견적서 · 운영자 주문 처리(2026-10-31). 기본 틀은 book-workflow.css를 그대로 쓴다. */
-.book-order-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 24px;padding:0;list-style:none;counter-reset:order-step}
-.book-order-steps li{counter-increment:order-step;display:flex;align-items:center;gap:10px;min-height:56px;padding:10px 14px;border-radius:14px;background:#f2f6ef;color:#294329;font-weight:700;font-size:15px;line-height:1.35}
-.book-order-steps li::before{content:counter(order-step);flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#2f6b3a;color:#fff;font-size:14px}
-.book-order-desk .book-order-list>article{grid-template-columns:minmax(0,1fr) 84px auto;align-items:center}
-.book-order-desk .book-order-list>article.chosen{background:#f7fbf3}
-.book-order-desk .book-quantity input{min-height:44px;font-size:16px}
-.book-order-price{font-weight:700;white-space:nowrap;color:#3d5a44}
-.book-order-totals .total{padding-top:12px;border-top:2px solid #293846;font-size:17px!important}
-.book-order-totals .total dd{font-size:20px;color:#1f5a2c}
-.book-order-history{display:grid;gap:6px;padding:16px 0;border-top:1px solid #e5e8ea}
-.book-order-history>div{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
-.book-order-history p{margin:0}
 .book-order-status{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:800;background:#eef0f2;color:#38444f}
 .book-order-status.status-awaiting_deposit{background:#fff1c7;color:#5c4300}
 .book-order-status.status-paid,.book-order-status.status-producing{background:#e2f0ff;color:#123f6b}
 .book-order-status.status-shipped{background:#e3f4e4;color:#1d4d24}
 .book-order-status.status-canceled{background:#f3e3e3;color:#6b1f1f}
-.book-order-legacy{margin-top:8px;text-align:center}
-.book-order-legacy a{color:inherit;text-decoration:underline}
-@media(max-width:860px){.book-order-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:560px){.book-order-desk .book-order-list>article{grid-template-columns:minmax(0,1fr) 84px}.book-order-price{grid-column:1/-1}.book-order-steps li{font-size:14px;min-height:48px;padding:8px 10px}}
 
 /* 견적서 */
 .book-order-banner{margin:0 0 16px;padding:14px 18px;border-radius:14px;background:#fff6d6;color:#4d3a07;font-size:16px;line-height:1.6}
